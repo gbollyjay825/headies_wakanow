@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en" data-accent="gold">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Road to Toronto · The Headies Travel</title>
+<link rel="stylesheet" href="headies.css">
+<style>
+  .wkmark{font-family:var(--font-display);font-weight:700;font-size:1.18rem;letter-spacing:0;color:var(--cream)}
+  .partner-lockup{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .shead .h2,.access .h2,.luxury-head .h2,.landing-cta .h2{font-size:clamp(1.85rem,3.2vw,3rem)}
+  .lead-form .h3{font-size:clamp(1.35rem,2vw,2rem)}
+
+  .travel-hero{position:relative;min-height:76svh;display:flex;align-items:center;padding:calc(var(--nav-h) + 34px) 0 38px;overflow:hidden;border-bottom:1px solid var(--line-gold)}
+  .travel-hero__media,.travel-hero__media image-slot,.travel-hero__media .ph{position:absolute;inset:0;height:100%;width:100%}
+  .travel-hero__media image-slot{filter:saturate(1.16) contrast(1.05) brightness(1.08)}
+  .travel-hero__shade{position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(8,8,10,.9) 0%,rgba(8,8,10,.64) 46%,rgba(8,8,10,.14) 100%),linear-gradient(180deg,rgba(8,8,10,.14) 0%,rgba(8,8,10,.1) 42%,rgba(8,8,10,.88) 100%)}
+  .travel-hero__inner{position:relative;z-index:3;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,370px);gap:clamp(30px,6vw,86px);align-items:center}
+  .travel-hero h1{max-width:12ch;margin:14px 0}
+  .travel-hero .h-hero{font-size:clamp(2.75rem,4.8vw,4.7rem);font-weight:var(--font-display-weight);line-height:.98}
+  .travel-hero .lead{max-width:54ch;font-size:clamp(1rem,1.12vw,1.14rem);line-height:1.62}
+  .hero-badges{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 24px}
+  .hero-badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-gold);border-radius:var(--r-pill);background:rgba(8,8,10,.42);padding:9px 13px;color:var(--cream);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;backdrop-filter:blur(4px)}
+  .hero-badge .icon{width:15px;height:15px;color:var(--gold)}
+  .hero-actions{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .travel-proof{display:grid;gap:1px;border:1px solid var(--line-gold);background:var(--line-gold);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow)}
+  .travel-proof__item{background:rgba(8,8,10,.72);backdrop-filter:blur(10px);padding:18px 20px}
+  .travel-proof__k{font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:800}
+  .travel-proof__v{font-family:var(--font-display);font-weight:var(--font-display-weight);font-size:1.22rem;line-height:1.12;margin-top:6px;color:var(--cream)}
+  .travel-proof__m{font-size:.86rem;color:var(--cream-dim);margin-top:6px}
+  #early-access,#white-glove,#visa-request{scroll-margin-top:calc(var(--nav-h) + 24px)}
+
+  .travel-signal{position:relative;z-index:4;margin-top:-1px;border-bottom:1px solid var(--line-gold);background:var(--ink-850)}
+  .signal-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line-gold);border-left:1px solid var(--line-gold);border-right:1px solid var(--line-gold)}
+  .signal{background:var(--ink-850);padding:22px 20px;display:flex;gap:13px;align-items:flex-start;min-height:112px}
+  .signal .icon{width:22px;height:22px;color:var(--gold);flex:0 0 auto}
+  .signal strong{display:block;font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;color:var(--cream)}
+  .signal span{display:block;color:var(--cream-dim);font-size:.9rem;margin-top:4px}
+
+  .access{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,.78fr);gap:clamp(22px,3.4vw,42px);align-items:start}
+  .access>.lead-form{align-self:start;margin-top:30px}
+  .arrival-collage{display:grid;grid-template-columns:1.05fr .95fr;grid-template-rows:1fr 1fr;gap:14px;min-height:430px;margin-top:26px}
+  .arrival-shot{position:relative;border:1px solid var(--line-gold);border-radius:var(--r-lg);overflow:hidden;min-height:0;background:var(--bg-card)}
+  .arrival-shot:first-child{grid-row:1/3}
+  .arrival-shot image-slot,.arrival-shot .ph{position:absolute;inset:0;height:100%;width:100%}
+  .arrival-shot__label{position:absolute;left:16px;right:16px;bottom:14px;z-index:2;font-size:.66rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+  .arrival-shot::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(0,0,0,0) 42%,rgba(3,3,5,.78) 100%)}
+  .access-copy{max-width:58ch}
+  .access-copy .lead{margin-top:18px}
+  .mini-list{display:grid;gap:12px;margin-top:28px}
+  .mini-list__item{display:flex;gap:12px;align-items:flex-start;color:var(--fg-dim)}
+  .mini-list__item .icon{width:19px;height:19px;color:var(--gold);margin-top:4px;flex:0 0 auto}
+
+  .pkgs{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+  @media(max-width:980px){.pkgs{grid-template-columns:1fr}}
+  .pkg{border:1px solid var(--line-gold);border-radius:var(--r-lg);overflow:hidden;background:var(--bg-card);
+    transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+  .pkg:hover{transform:translateY(-4px);box-shadow:var(--shadow-lift)}
+  .pkg__media{position:relative;aspect-ratio:16/10}
+  .pkg__media image-slot,.pkg__media .ph{position:absolute;inset:0;height:100%}
+  .pkg__city{position:absolute;left:18px;bottom:14px;z-index:2;font-family:var(--font-display);font-weight:var(--font-display-weight);font-size:1.16rem;color:var(--cream)}
+  .pkg__body{padding:24px;display:grid;gap:14px}
+  .pkg__tag{font-size:.62rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+  .pkg h3{font-size:1.18rem}
+  .pkg p{font-size:.94rem;color:var(--fg-dim)}
+  .pkg__row{display:flex;align-items:center;gap:10px;font-size:.88rem;color:var(--fg-dim);margin-bottom:8px}
+  .pkg__row .icon{width:16px;height:16px;color:var(--gold)}
+  .pss{display:inline-flex;align-items:center;gap:7px;background:rgba(212,175,55,.14);color:var(--gold);
+    border:1px solid var(--line-gold);border-radius:var(--r-pill);padding:5px 12px;font-size:.72rem;font-weight:800;letter-spacing:.04em;margin-top:10px}
+  .pss .icon{width:14px;height:14px}
+
+  .why{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+  @media(max-width:860px){.why{grid-template-columns:1fr 1fr}}
+  .whyitem{text-align:left}
+  .whyitem .icon{width:30px;height:30px;color:var(--gold);margin-bottom:14px}
+  .whyitem h4{font-size:1rem;margin-bottom:6px}
+
+  .luxury-head{display:grid;grid-template-columns:minmax(0,.9fr) minmax(320px,.72fr);gap:clamp(24px,4vw,54px);align-items:end;margin-bottom:30px}
+  .luxury-head .lead{margin:0}
+  .concierge{display:grid;grid-template-columns:minmax(0,.82fr) minmax(360px,1fr);gap:26px;align-items:stretch}
+  .concierge__intro{position:relative;display:grid;grid-template-rows:minmax(360px,1fr) auto;gap:14px}
+  .concierge__visual{position:relative;border:1px solid var(--line-gold);border-radius:var(--r-lg);overflow:hidden;background:var(--bg-card)}
+  .concierge__visual image-slot,.concierge__visual .ph{position:absolute;inset:0;height:100%;width:100%}
+  .concierge__visual::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,8,10,.08),rgba(8,8,10,.62));z-index:1}
+  .concierge__caption{position:absolute;left:18px;right:18px;bottom:16px;z-index:2;font-size:.68rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+  .concierge__notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;border:1px solid var(--line-gold);background:var(--line-gold);border-radius:var(--r);overflow:hidden}
+  .concierge__note{background:rgba(8,8,10,.72);padding:15px;display:flex;gap:10px;align-items:flex-start}
+  .concierge__note .icon{width:17px;height:17px;color:var(--gold);flex:0 0 auto;margin-top:2px}
+  .concierge__note strong{display:block;color:var(--cream);font-size:.82rem;font-weight:700;line-height:1.2}
+  .concierge__note span{display:block;color:var(--fg-dim);font-size:.78rem;line-height:1.35;margin-top:3px}
+  .concierge>.lead-form{margin-top:0}
+  .concierge .lead-form--panel{background:rgba(18,18,24,.86);box-shadow:none}
+  .service-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-top:24px}
+  .service-card{border:1px solid var(--line-gold);border-radius:var(--r);background:var(--bg-card);overflow:hidden;min-height:0}
+  .service-card__media{position:relative;aspect-ratio:4/3;background:var(--ink-800)}
+  .service-card__media image-slot,.service-card__media .ph{position:absolute;inset:0;height:100%;width:100%}
+  .service-card__media::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(8,8,10,.04),rgba(8,8,10,.42))}
+  .service-card__body{padding:15px;min-height:136px}
+  .service-card .icon{width:21px;height:21px;color:var(--gold);margin-bottom:12px}
+  .service-card h3{font-size:1.06rem;margin-bottom:8px}
+  .service-card p{font-size:.84rem;line-height:1.48;color:var(--fg-dim)}
+  .service-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .service-option{display:flex;align-items:center;gap:10px;border:1px solid var(--line-gold);border-radius:var(--r-sm);
+    background:rgba(8,8,10,.38);padding:13px 14px;color:var(--cream);font-size:.9rem;letter-spacing:0;text-transform:none}
+  .lead-form .service-option{flex-direction:row;justify-content:flex-start;text-align:left}
+  .service-option input{width:18px;height:18px;accent-color:var(--gold);flex:0 0 18px}
+  .lead-form textarea{width:100%;min-height:118px;resize:vertical;background:rgba(8,8,10,.62);border:1px solid var(--line-gold);
+    border-radius:var(--r-sm);padding:14px 15px;color:var(--cream);font-family:inherit;font-size:.96rem}
+  .lead-form textarea::placeholder{color:var(--cream-faint)}
+  .lead-form textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.18)}
+  .landing-cta{position:relative;overflow:hidden;border-top:1px solid var(--line-gold);border-bottom:1px solid var(--line-gold);min-height:470px;display:flex;align-items:center}
+  .landing-cta__media,.landing-cta__media image-slot,.landing-cta__media .ph{position:absolute;inset:0;width:100%;height:100%}
+  .landing-cta__shade{position:absolute;inset:0;background:linear-gradient(90deg,var(--ink-900) 0%,rgba(8,8,10,.78) 48%,rgba(8,8,10,.3) 100%),linear-gradient(180deg,rgba(8,8,10,.16),rgba(8,8,10,.82));z-index:1}
+  .landing-cta__body{position:relative;z-index:2;max-width:720px}
+  .landing-cta .lead{margin:16px 0 28px}
+
+  @media(max-width:1080px){.travel-hero__inner,.access,.luxury-head{grid-template-columns:1fr}.access>.lead-form{margin-top:0}.travel-proof{max-width:720px}.arrival-collage{min-height:360px}.signal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.service-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media(max-width:980px){.concierge{grid-template-columns:1fr}.concierge__intro{grid-template-rows:auto}.concierge__visual{aspect-ratio:16/9;min-height:320px}.service-options{grid-template-columns:1fr}.service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:720px){.travel-hero{min-height:auto;padding:calc(var(--nav-h) + 42px) 0 46px}.travel-hero h1{max-width:11ch}.travel-hero .h-hero{font-size:clamp(2.35rem,12vw,3.45rem)}.travel-proof{display:none}.hero-actions .btn{width:100%}.signal-grid{grid-template-columns:1fr}.arrival-collage{grid-template-columns:1fr;grid-template-rows:none;min-height:0}.arrival-shot,.arrival-shot:first-child{grid-row:auto;aspect-ratio:4/3}.concierge__visual{aspect-ratio:4/3;min-height:0}.concierge__notes,.service-grid{grid-template-columns:1fr}.lead-form__actions .btn{width:100%}.landing-cta{min-height:420px}}
+  @media(max-width:720px){.travel-hero{padding:calc(var(--nav-h) + 30px) 0 34px}.travel-hero h1{max-width:100%}.travel-hero .h-hero{font-size:clamp(2.25rem,10.6vw,3rem)}.travel-hero .lead{font-size:.98rem;line-height:1.55}.hero-badges{margin:18px 0 20px}.hero-actions{display:grid;grid-template-columns:1fr 1fr}.hero-actions .btn{width:100%;min-width:0;padding-left:14px;padding-right:14px}.hero-actions .btn:first-child{grid-column:1/-1}}
+</style>
+</head>
+<body id="top" data-theme="dark">
+<div class="grain"></div>
+
+<nav class="nav">
+  <div class="container container-wide nav__inner">
+    <a class="brand" href="#top" aria-label="The Headies home"><img class="brand__logo" src="assets/headies-logo.png" alt="The Headies"></a>
+    <ul class="nav__links">
+      <li><a href="#top">Home</a></li><li><a href="#early-access">Packages</a></li>
+      <li><a href="#white-glove">Luxury Service</a></li><li><a href="#visa-request">Visa</a></li>
+      <li><a href="#why-wakanow">Partner</a></li>
+    </ul>
+    <div class="nav__actions">
+      <a href="#early-access" class="btn btn-gold">Get early access</a>
+      <button class="nav__burger" aria-label="Open menu"><i data-lucide="menu"></i></button>
+    </div>
+  </div>
+</nav>
+<div class="drawer">
+  <button class="drawer__close" aria-label="Close menu"><i data-lucide="x"></i></button>
+  <a href="#top">Home</a><a href="#early-access">Packages</a><a href="#white-glove">Luxury Service</a><a href="#visa-request">Visa</a><a href="#why-wakanow">Partner</a>
+</div>
+
+<header class="travel-hero" data-screen-label="Travel landing">
+  <div class="travel-hero__media">
+    <image-slot id="travel-hero" src="assets/generated/canada-night-lights-hero.jpg?v=20260615-night-lights" class="media-fill" placeholder="Drop a Canada night skyline image"></image-slot>
+    <div class="ph media-fill" style="z-index:-1"></div>
+  </div>
+  <div class="travel-hero__shade"></div>
+  <div class="container">
+    <div class="travel-hero__inner">
+      <div class="travel-hero__copy reveal">
+        <p class="crumbs"><a href="#top">Home</a> &nbsp;/&nbsp; Travel Access</p>
+        <div class="partner-lockup" style="margin-bottom:14px">
+          <span class="eyebrow" style="margin:0">Official Travel Partner</span>
+          <span class="wkmark">Wakanow</span>
+        </div>
+        <h1 class="h-hero">Road to Toronto</h1>
+        <p class="lead">Travel support for The Headies Canada weekend. Join the package list, request visa guidance, or send a luxury service request for flights, stays and arrival movement.</p>
+        <div class="hero-badges" aria-label="Travel support highlights">
+          <span class="hero-badge"><i data-lucide="plane-takeoff" class="icon"></i> Flights</span>
+          <span class="hero-badge"><i data-lucide="building-2" class="icon"></i> Hotels and villas</span>
+          <span class="hero-badge"><i data-lucide="car-front" class="icon"></i> Transfers</span>
+          <span class="hero-badge"><i data-lucide="file-check-2" class="icon"></i> Visa guidance</span>
+          <span class="hero-badge"><i data-lucide="sparkles" class="icon"></i> Concierge</span>
+        </div>
+        <div class="hero-actions">
+          <a href="#early-access" class="btn btn-gold btn-lg">Get early access</a>
+          <a href="#white-glove" class="btn btn-outline btn-lg">Luxury service</a>
+          <a href="#visa-request" class="btn btn-outline btn-lg">Need a visa?</a>
+        </div>
+      </div>
+      <aside class="travel-proof reveal" data-d="1" aria-label="Travel access summary">
+        <div class="travel-proof__item">
+          <div class="travel-proof__k">Destination</div>
+          <div class="travel-proof__v">Canada weekend</div>
+          <div class="travel-proof__m">Built around awards night, red carpet and partner events.</div>
+        </div>
+        <div class="travel-proof__item">
+          <div class="travel-proof__k">Travel partner</div>
+          <div class="travel-proof__v">Wakanow</div>
+          <div class="travel-proof__m">Package release, travel enquiries and guest support.</div>
+        </div>
+        <div class="travel-proof__item">
+          <div class="travel-proof__k">Access path</div>
+          <div class="travel-proof__v">Early list first</div>
+          <div class="travel-proof__m">Travel drops will go to registered guests before public release.</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</header>
+
+<section class="travel-signal" aria-label="Travel support overview">
+  <div class="container">
+    <div class="signal-grid">
+      <div class="signal"><i data-lucide="ticket-check" class="icon"></i><div><strong>Event-led planning</strong><span>Packages shaped around the Headies schedule.</span></div></div>
+      <div class="signal"><i data-lucide="hotel" class="icon"></i><div><strong>Stay options</strong><span>Hotel blocks, premium stays and villa requests.</span></div></div>
+      <div class="signal"><i data-lucide="route" class="icon"></i><div><strong>Arrival movement</strong><span>Airport pickup, venue transfers and private car hire.</span></div></div>
+      <div class="signal"><i data-lucide="headphones" class="icon"></i><div><strong>Human follow-up</strong><span>A travel contact will respond when packages open.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- EARLY ACCESS -->
+<section class="section section--tight" id="early-access" data-screen-label="Travel early access">
+  <div class="container access">
+    <div class="reveal">
+      <div class="access-copy">
+        <p class="eyebrow">Package access</p>
+        <h2 class="h2" style="margin-top:14px">Be first to see the Canada travel drops</h2>
+        <p class="lead">Flights, visa guidance, hotels, ticket bundles and transfer options are being finalized with Wakanow. Share your details and we will send package access as soon as it opens.</p>
+        <div class="mini-list">
+          <div class="mini-list__item"><i data-lucide="mail-check" class="icon"></i><span>Get notified before packages are shared publicly.</span></div>
+          <div class="mini-list__item"><i data-lucide="calendar-check" class="icon"></i><span>Receive options built around the awards weekend schedule.</span></div>
+          <div class="mini-list__item"><i data-lucide="badge-dollar-sign" class="icon"></i><span>Access flexible payment information when available.</span></div>
+        </div>
+      </div>
+      <div class="arrival-collage" aria-label="Travel moments">
+        <figure class="arrival-shot">
+          <image-slot id="travel-arrival-1" src="assets/images/airport-arrival.jpg" class="media-fill" placeholder="Drop a suitcase airport image"></image-slot>
+          <div class="ph media-fill" style="z-index:-1"></div>
+          <figcaption class="arrival-shot__label">Airport arrival</figcaption>
+        </figure>
+        <figure class="arrival-shot">
+          <image-slot id="travel-arrival-2" src="assets/images/business-class.jpg" class="media-fill" placeholder="Drop a business class cabin image"></image-slot>
+          <div class="ph media-fill" style="z-index:-1"></div>
+          <figcaption class="arrival-shot__label">Business class</figcaption>
+        </figure>
+        <figure class="arrival-shot">
+          <image-slot id="travel-arrival-3" src="assets/images/hotel-lobby.jpg" class="media-fill" placeholder="Drop a hotel lobby image"></image-slot>
+          <div class="ph media-fill" style="z-index:-1"></div>
+          <figcaption class="arrival-shot__label">Hotel stay</figcaption>
+        </figure>
+      </div>
+    </div>
+    <div class="lead-form lead-form--panel reveal" data-d="1">
+      <p class="eyebrow">Join the list</p>
+      <h3 class="h3" style="margin:12px 0 8px">Get early access</h3>
+      <p class="muted">Leave your details and we will notify you when Canada package deals are released.</p>
+      <form class="lead-form" data-early-access-form>
+        <div class="lead-form__grid">
+          <label>Name <input name="name" type="text" autocomplete="name" placeholder="Full name" required></label>
+          <label>Email <input name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+          <label>Phone <input name="phone" type="tel" autocomplete="tel" placeholder="+234..." required></label>
+        </div>
+        <div class="lead-form__actions">
+          <button class="btn btn-gold" type="submit">Get early access</button>
+          <p class="lead-form__status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- PACKAGES -->
+<section class="section section--ink" data-screen-label="Packages">
+  <div class="container">
+    <div class="shead reveal">
+      <div class="shead__title"><p class="eyebrow">Headies travel packages</p><h2 class="h2" style="margin-top:14px">Choose your arrival style</h2></div>
+      <p class="lead">Three early-access paths for guests coming in for the weekend. Full inclusions will be confirmed through the travel list first.</p>
+    </div>
+    <div class="pkgs">
+      <article class="pkg reveal" data-d="1">
+        <div class="pkg__media"><image-slot id="pk1" src="assets/images/flight-stay.jpg" class="media-fill" placeholder="Drop an airplane window image"></image-slot><div class="ph media-fill" style="z-index:-1"></div><div class="legend__grad"></div><div class="pkg__city">Flight + Stay</div></div>
+        <div class="pkg__body">
+          <div class="pkg__tag">Weekend access</div>
+          <h3>Fly in for awards night</h3>
+          <p>A straightforward package path for guests who need flights, a stay and airport movement around the main event.</p>
+          <div>
+            <div class="pkg__row"><i data-lucide="plane" class="icon"></i> Return flights + 4 nights</div>
+            <div class="pkg__row"><i data-lucide="star" class="icon"></i> Hotel options near the weekend activity</div>
+            <div class="pss"><i data-lucide="credit-card" class="icon"></i> Pay Small Small when available</div>
+          </div>
+          <a href="#early-access" class="btn btn-gold">Get early access</a>
+          <a href="#white-glove" class="tlink">Need luxury service? <i data-lucide="arrow-right" class="icon" style="width:14px"></i></a>
+        </div>
+      </article>
+      <article class="pkg reveal" data-d="2">
+        <div class="pkg__media"><image-slot id="pk2" src="assets/images/hotel-event.jpg" class="media-fill" placeholder="Drop a hotel luggage image"></image-slot><div class="ph media-fill" style="z-index:-1"></div><div class="legend__grad"></div><div class="pkg__city">Hotel + Event</div></div>
+        <div class="pkg__body">
+          <div class="pkg__tag">Premium guest flow</div>
+          <h3>Add event access and arrival planning</h3>
+          <p>For guests who want their travel plan to connect cleanly with the show, red carpet and partner moments.</p>
+          <div>
+            <div class="pkg__row"><i data-lucide="plane" class="icon"></i> Return flights + 4 nights</div>
+            <div class="pkg__row"><i data-lucide="ticket" class="icon"></i> Premium event ticket information</div>
+            <div class="pss"><i data-lucide="credit-card" class="icon"></i> Pay Small Small when available</div>
+          </div>
+          <a href="#early-access" class="btn btn-gold">Get early access</a>
+          <a href="#white-glove" class="tlink">Need luxury service? <i data-lucide="arrow-right" class="icon" style="width:14px"></i></a>
+        </div>
+      </article>
+      <article class="pkg reveal" data-d="3">
+        <div class="pkg__media"><image-slot id="pk3" src="assets/images/airport-transfer.jpg" class="media-fill" placeholder="Drop an airport transfer image"></image-slot><div class="ph media-fill" style="z-index:-1"></div><div class="legend__grad"></div><div class="pkg__city">Transfers</div></div>
+        <div class="pkg__body">
+          <div class="pkg__tag">High-touch access</div>
+          <h3>Build a premium weekend plan</h3>
+          <p>For executives, partners, artists, teams and guests who need elevated stays, movement and support.</p>
+          <div>
+            <div class="pkg__row"><i data-lucide="plane" class="icon"></i> Business-class enquiry path</div>
+            <div class="pkg__row"><i data-lucide="crown" class="icon"></i> Suites, VIP ticket guidance and transfers</div>
+            <div class="pss"><i data-lucide="credit-card" class="icon"></i> Pay Small Small when available</div>
+          </div>
+          <a href="#early-access" class="btn btn-gold">Get early access</a>
+          <a href="#white-glove" class="tlink">Need luxury service? <i data-lucide="arrow-right" class="icon" style="width:14px"></i></a>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- EXCLUSIVE LUXURY SERVICE -->
+<section class="section" id="white-glove" data-screen-label="Exclusive luxury service travel">
+  <div class="container">
+    <div class="luxury-head reveal">
+      <div>
+        <p class="eyebrow">Exclusive Luxury Service</p>
+        <h2 class="h2" style="margin:14px 0 0">Private travel, stays and arrival support</h2>
+      </div>
+      <p class="lead">For guests who need a higher-touch travel plan, request commercial flight support, visa guidance, private jet support, hotels and villas, airport transfer, or private car hire for The Headies Canada weekend.</p>
+    </div>
+    <div class="concierge">
+      <div class="concierge__intro reveal">
+        <div class="concierge__visual">
+          <image-slot id="travel-concierge" src="assets/generated/headies-branded-private-jet.jpg?v=20260615-attached-jet" class="media-fill" placeholder="Drop a private jet image"></image-slot>
+          <div class="ph media-fill" style="z-index:-1"></div>
+          <div class="concierge__caption">From landing to check-in</div>
+        </div>
+        <div class="concierge__notes" aria-label="Luxury service request highlights">
+          <div class="concierge__note"><i data-lucide="file-check-2" class="icon"></i><div><strong>Visa guidance</strong><span>Request support notes alongside travel details.</span></div></div>
+          <div class="concierge__note"><i data-lucide="plane-takeoff" class="icon"></i><div><strong>Flight paths</strong><span>Commercial, private and group travel requests.</span></div></div>
+          <div class="concierge__note"><i data-lucide="car-front" class="icon"></i><div><strong>Arrival movement</strong><span>Airport transfer and private car hire planning.</span></div></div>
+        </div>
+      </div>
+      <div class="lead-form lead-form--panel reveal" id="visa-request" data-d="1">
+        <p class="eyebrow">Request concierge support</p>
+        <h3 class="h3" style="margin:12px 0 8px">Tell us what you need</h3>
+        <p class="muted">A travel concierge will use this request to prepare the right partner follow-up.</p>
+        <form class="lead-form" data-white-glove-form>
+          <div class="lead-form__grid">
+            <label>Name <input name="name" type="text" autocomplete="name" placeholder="Full name" required></label>
+            <label>Email <input name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+            <label>Phone <input name="phone" type="tel" autocomplete="tel" placeholder="+234..." required></label>
+          </div>
+          <div class="service-options" aria-label="Exclusive luxury service options">
+            <label class="service-option"><input type="checkbox" name="services" value="Private Jets"> Private Jets</label>
+            <label class="service-option"><input type="checkbox" name="services" value="Commercial Flight"> Commercial Flight</label>
+            <label class="service-option"><input type="checkbox" name="services" value="Visa Support"> Visa Support</label>
+            <label class="service-option"><input type="checkbox" name="services" value="Hotels and Villas"> Hotels and Villas</label>
+            <label class="service-option"><input type="checkbox" name="services" value="Airport Transfer"> Airport Transfer</label>
+            <label class="service-option"><input type="checkbox" name="services" value="Private Car Hire"> Private Car Hire</label>
+          </div>
+          <label>Trip notes <textarea name="notes" placeholder="Share dates, guest count, visa needs, flight class, preferred city, vehicle type, room style, or any special requirements."></textarea></label>
+          <div class="lead-form__actions">
+            <button class="btn btn-gold" type="submit">Request luxury service</button>
+            <p class="lead-form__status" role="status" aria-live="polite"></p>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="service-grid reveal" data-d="2" aria-label="Luxury service options">
+      <article class="service-card">
+        <div class="service-card__media"><image-slot id="service-private-jets" src="assets/generated/headies-branded-private-jet.jpg?v=20260615-attached-jet" class="media-fill" placeholder="Drop a private jet image"></image-slot><div class="ph media-fill" style="z-index:-1"></div></div>
+        <div class="service-card__body">
+          <i data-lucide="plane" class="icon"></i>
+          <h3>Private Jets</h3>
+          <p>Charter enquiry support for private arrivals, group movement and executive travel.</p>
+        </div>
+      </article>
+      <article class="service-card">
+        <div class="service-card__media"><image-slot id="service-commercial-flight" src="assets/images/business-class.jpg" class="media-fill" placeholder="Drop a commercial flight image"></image-slot><div class="ph media-fill" style="z-index:-1"></div></div>
+        <div class="service-card__body">
+          <i data-lucide="plane-takeoff" class="icon"></i>
+          <h3>Commercial Flight</h3>
+          <p>Flight enquiry support for cabin class, routing, group travel and arrival timing.</p>
+        </div>
+      </article>
+      <article class="service-card">
+        <div class="service-card__media"><image-slot id="service-hotels-villas" src="assets/images/hotel-lobby.jpg" class="media-fill" placeholder="Drop a hotel lobby image"></image-slot><div class="ph media-fill" style="z-index:-1"></div></div>
+        <div class="service-card__body">
+          <i data-lucide="building-2" class="icon"></i>
+          <h3>Hotels and Villas</h3>
+          <p>Premium hotel blocks, villa requests and private accommodation preferences.</p>
+        </div>
+      </article>
+      <article class="service-card">
+        <div class="service-card__media"><image-slot id="service-airport-transfer" src="assets/images/airport-transfer.jpg" class="media-fill" placeholder="Drop an airport transfer image"></image-slot><div class="ph media-fill" style="z-index:-1"></div></div>
+        <div class="service-card__body">
+          <i data-lucide="route" class="icon"></i>
+          <h3>Airport Transfer</h3>
+          <p>Arrival and departure movement from airport to hotel, venue and private events.</p>
+        </div>
+      </article>
+      <article class="service-card">
+        <div class="service-card__media"><image-slot id="service-private-car" src="assets/generated/black-car-service-arrival.jpg?v=20260615-black-car-service" class="media-fill" placeholder="Drop a private car hire image"></image-slot><div class="ph media-fill" style="z-index:-1"></div></div>
+        <div class="service-card__body">
+          <i data-lucide="car-front" class="icon"></i>
+          <h3>Private Car Hire</h3>
+          <p>Chauffeured cars, SUVs and dedicated vehicles for guests and teams.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- WHY WAKANOW -->
+<section class="section section--ink" id="why-wakanow" data-screen-label="Why Wakanow">
+  <div class="container">
+    <div class="shead reveal">
+      <div class="shead__title">
+        <p class="eyebrow">Travel desk promise</p>
+        <h2 class="h2" style="margin-top:14px">Everything guests need before they land</h2>
+      </div>
+      <p class="lead">From group travel to private concierge requests, guests can choose the level of support they need before they arrive.</p>
+    </div>
+    <div class="why">
+      <div class="whyitem reveal" data-d="1"><i data-lucide="badge-check" class="icon"></i><h4>Clear package access</h4><p class="muted" style="font-size:.92rem">Early signups receive package information as soon as the release window opens.</p></div>
+      <div class="whyitem reveal" data-d="2"><i data-lucide="credit-card" class="icon"></i><h4>Payment flexibility</h4><p class="muted" style="font-size:.92rem">Pay Small Small details can be shared with available package options.</p></div>
+      <div class="whyitem reveal" data-d="3"><i data-lucide="headphones" class="icon"></i><h4>Concierge follow-up</h4><p class="muted" style="font-size:.92rem">Exclusive luxury service requests are captured separately for focused partner response.</p></div>
+      <div class="whyitem reveal" data-d="4"><i data-lucide="shield-check" class="icon"></i><h4>Guest-ready planning</h4><p class="muted" style="font-size:.92rem">Flights, stays, transfers and private movement are presented in one place.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="landing-cta" id="travel-final" data-screen-label="Travel CTA">
+  <div class="landing-cta__media">
+    <image-slot id="travel-final-cta" src="assets/images/toronto-cta.jpg" class="media-fill" placeholder="Drop a Toronto skyline image"></image-slot>
+    <div class="ph media-fill" style="z-index:-1"></div>
+  </div>
+  <div class="landing-cta__shade"></div>
+  <div class="container">
+    <div class="landing-cta__body reveal">
+      <p class="eyebrow">Canada travel list</p>
+      <h2 class="h2" style="margin-top:16px">Arrive ready for The Headies weekend</h2>
+      <p class="lead">Get on the package list now, or request visa guidance and private support if your travel plan needs a higher-touch path.</p>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <a href="#early-access" class="btn btn-gold btn-lg">Get early access</a>
+        <a href="#white-glove" class="btn btn-outline btn-lg">Luxury service</a>
+        <a href="#visa-request" class="btn btn-outline btn-lg">Need a visa?</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container container-wide">
+    <div class="footer__top">
+      <div>
+        <a class="brand" href="#top"><img class="brand__logo" src="assets/headies-logo.png" alt="The Headies"></a>
+        <p class="muted" style="max-width:38ch;font-size:.95rem">Africa's biggest and most prestigious music award - celebrating the best in Afrobeats, African music, global sound and culture since 2006.</p>
+        <p class="muted" style="font-size:.82rem;margin-top:14px">Travel partner: <span class="wkmark" style="font-size:1rem">Wakanow</span></p>
+      </div>
+      <div class="footer__cols"><h5>Explore</h5><a href="#early-access">Packages</a><a href="#white-glove">Luxury Service</a><a href="#visa-request">Visa Support</a><a href="#why-wakanow">Travel Partner</a></div>
+      <div class="footer__cols"><h5>Travel</h5><a href="#early-access">Get early access</a><a href="#white-glove">Request luxury service</a><a href="#travel-final">Road to Toronto</a><a href="#top">Back to top</a></div>
+    </div>
+    <div class="footer__bottom">
+      <p class="copyright">© 2026 The Headies. Africa to the World.</p>
+      <div class="footer__social">
+        <a href="#" aria-label="Instagram"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="#" aria-label="X"><svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"/></svg></a>
+        <a href="#" aria-label="Facebook"><svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.49-3.91 3.78-3.91 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.44 2.91h-2.34V22c4.78-.76 8.44-4.92 8.44-9.94Z"/></svg></a>
+        <a href="#" aria-label="YouTube"><svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.5a3 3 0 0 0-2.11-2.12C19.5 3.86 12 3.86 12 3.86s-7.5 0-9.39.52A3 3 0 0 0 .5 6.5 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.5 3 3 0 0 0 2.11 2.12c1.89.52 9.39.52 9.39.52s7.5 0 9.39-.52a3 3 0 0 0 2.11-2.12A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.5ZM9.6 15.57V8.43L15.82 12 9.6 15.57Z"/></svg></a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="image-slot.js"></script>
+<script src="headies.js?v=20260615-exclusive-luxury"></script>
+<script src="vendor/lucide.js"></script>
+<script>window.dispatchEvent(new Event('headies:lucide-ready'));</script>
+</body>
+</html>
