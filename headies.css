@@ -165,8 +165,8 @@ body[data-theme="dark"]::before{
 }
 .flyover.is-active .flyover__trail{animation:flyover-trail 5.8s var(--ease) .2s both}
 .flyover__plane-wrap{
-  position:absolute;left:0;top:25%;z-index:2;width:min(92vw,1120px);min-width:560px;
-  opacity:0;transform:translate3d(118vw,-14vh,0) rotate(5deg) scale(.82);
+  position:absolute;left:0;top:21%;z-index:2;width:min(92vw,1120px);min-width:560px;
+  opacity:0;transform:translate3d(118vw,-22vh,0) rotate(6deg) scale(.82);
   transform-origin:50% 50%;will-change:transform,opacity;
 }
 .flyover.is-active .flyover__plane-wrap{animation:flyover-plane 5.8s cubic-bezier(.16,.72,.12,1) .22s both}
@@ -176,17 +176,17 @@ body[data-theme="dark"]::before{
 }
 
 @keyframes flyover-plane{
-  0%{opacity:0;transform:translate3d(118vw,-14vh,0) rotate(5deg) scale(.82)}
+  0%{opacity:0;transform:translate3d(118vw,-22vh,0) rotate(6deg) scale(.82)}
   12%{opacity:1}
-  46%{opacity:1;transform:translate3d(17vw,-1vh,0) rotate(-2deg) scale(1)}
+  46%{opacity:1;transform:translate3d(17vw,-7vh,0) rotate(-1deg) scale(1)}
   78%{opacity:1}
-  100%{opacity:0;transform:translate3d(-120vw,10vh,0) rotate(-8deg) scale(.66)}
+  100%{opacity:0;transform:translate3d(-120vw,20vh,0) rotate(-9deg) scale(.66)}
 }
 @keyframes flyover-trail{
-  0%{opacity:0;transform:translate3d(132vw,-13vh,0) scaleX(.55)}
+  0%{opacity:0;transform:translate3d(132vw,-21vh,0) scaleX(.55)}
   18%{opacity:.78}
-  58%{opacity:.52;transform:translate3d(52vw,-2vh,0) scaleX(1)}
-  100%{opacity:0;transform:translate3d(-22vw,8vh,0) scaleX(.35)}
+  58%{opacity:.52;transform:translate3d(52vw,-8vh,0) scaleX(1)}
+  100%{opacity:0;transform:translate3d(-22vw,18vh,0) scaleX(.35)}
 }
 @keyframes flyover-caption{
   0%,10%{opacity:0;transform:translateY(12px)}
@@ -195,7 +195,7 @@ body[data-theme="dark"]::before{
 }
 
 @media(max-width:760px){
-  .flyover__plane-wrap{top:31%;width:176vw;min-width:0}
+  .flyover__plane-wrap{top:27%;width:176vw;min-width:0}
   .flyover__caption{left:22px;right:72px;bottom:24px}
   .flyover__caption strong{font-size:1.55rem}
   .flyover__close{top:18px;right:18px;width:44px;height:44px}
@@ -205,7 +205,7 @@ body[data-theme="dark"]::before{
   .flyover.is-active .flyover__plane-wrap,
   .flyover.is-active .flyover__trail,
   .flyover.is-active .flyover__caption{animation:none}
-  .flyover.is-active .flyover__plane-wrap{opacity:1;transform:translate3d(6vw,0,0) rotate(-2deg) scale(.86)}
+  .flyover.is-active .flyover__plane-wrap{opacity:1;transform:translate3d(6vw,-4vh,0) rotate(-1deg) scale(.86)}
   .flyover.is-active .flyover__caption{opacity:1;transform:none}
   .flyover__trail{opacity:.42;transform:none}
 }
