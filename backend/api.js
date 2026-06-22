@@ -58,7 +58,12 @@ async function handleApi(method, pathname, body = {}) {
       return response(200, { applicants: await repository.listEligible() });
     }
     if (method === 'POST' && parts[2] === 'signup') {
-      const applicant = await repository.signupApplicant(body);
+      let applicant;
+      try {
+        applicant = await repository.signupApplicant(body);
+      } catch (error) {
+        return response(error.status || 400, { error: error.message || 'Could not complete applicant signup.' });
+      }
       return response(201, {
         applicant: {
           id: applicant.id,
@@ -67,7 +72,9 @@ async function handleApi(method, pathname, body = {}) {
           phone: applicant.phone,
           category: applicant.category,
           status: applicant.status,
+          source: applicant.source,
           notes: applicant.notes,
+          signupCompletedAt: applicant.signupCompletedAt,
           createdAt: applicant.createdAt,
           updatedAt: applicant.updatedAt
         }

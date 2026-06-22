@@ -42,6 +42,7 @@ button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 input,select,textarea{color-scheme:dark}
 section{scroll-margin-top:96px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 .page-shell{min-height:100vh;background:linear-gradient(180deg,#070b12 0%,#0a101a 48%,#070b12 100%)}
 .container{width:100%;max-width:var(--container);margin:0 auto;padding:0 24px}
@@ -61,6 +62,12 @@ section{scroll-margin-top:96px}
 .nav-actions{margin-left:auto;display:flex;align-items:center;gap:12px}
 .currency{font-size:13px;color:var(--muted)}
 .mobile-menu{display:none;width:42px;height:42px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--text)}
+.mobile-menu__bars{display:grid;gap:4px;width:18px}
+.mobile-menu__bars i{display:block;height:2px;border-radius:999px;background:currentColor;transition:transform .18s ease,opacity .18s ease}
+.mobile-menu.is-open .mobile-menu__bars i:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.mobile-menu.is-open .mobile-menu__bars i:nth-child(2){opacity:0}
+.mobile-menu.is-open .mobile-menu__bars i:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.mobile-drawer{display:none}
 
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
@@ -268,7 +275,13 @@ section{scroll-margin-top:96px}
 
 @media(max-width:1024px){
   .nav-links,.currency{display:none}
-  .mobile-menu{display:inline-grid;place-items:center}
+  .site-nav__inner{gap:16px}
+  .mobile-menu{display:inline-grid;place-items:center;margin-left:auto;flex:0 0 auto}
+  .mobile-drawer{display:grid;width:min(calc(100% - 32px),var(--container));max-height:0;margin:0 auto;overflow:hidden;opacity:0;transition:max-height .24s ease,opacity .2s ease,padding .2s ease}
+  .mobile-drawer.is-open{max-height:420px;opacity:1;padding:8px 0 16px}
+  .mobile-drawer a{display:flex;align-items:center;min-height:48px;padding:0 14px;border-top:1px solid var(--line);color:#dce7f5;font-size:15px;font-weight:800}
+  .mobile-drawer a.is-active{color:#fff;background:rgba(121,173,255,.1)}
+  .mobile-drawer__cta{justify-content:center;margin-top:10px;border:1px solid rgba(245,130,32,.5)!important;border-radius:var(--radius);background:rgba(245,130,32,.14);color:#fff!important}
   .hero__inner,.page-hero__grid,.wizard-layout,.split-layout,.luxury-grid,.portal-grid,.admin-grid{grid-template-columns:1fr}
   .summary-card,.sticky-panel{position:static}
   .split-layout>.sticky-panel{order:-1}
@@ -278,19 +291,77 @@ section{scroll-margin-top:96px}
   .footer-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:760px){
-  .topbar__right{display:none}
-  .site-nav__inner{height:auto;min-height:68px}
-  .brand img:first-child{height:31px}
-  .brand img:last-child{height:21px}
+  section{scroll-margin-top:78px}
+  .container{padding-left:16px;padding-right:16px}
+  .topbar{display:none}
+  .site-nav__inner{height:auto;min-height:64px;padding-top:8px;padding-bottom:8px}
+  .brand{gap:9px;min-width:0}
+  .brand img:first-child{height:29px}
+  .brand img:last-child{height:20px}
+  .brand__divider{height:22px}
   .nav-actions .btn{display:none}
-  .hero__inner,.page-hero__grid{padding-top:46px;padding-bottom:52px}
-  .hero h1,.page-hero h1{font-size:42px}
+  .mobile-drawer{width:calc(100% - 28px)}
+  .hero__inner,.page-hero__grid{gap:28px;padding:38px 16px 46px}
+  .hero h1,.page-hero h1{font-size:clamp(38px,11vw,46px)}
   .hero__copy p,.page-hero p{font-size:16px}
+  .hero-pills{margin:20px -2px 24px;gap:7px}
+  .hero-pills span{font-size:12px;padding:7px 10px}
+  .hero-actions,.form-actions{display:grid;grid-template-columns:1fr;gap:10px}
+  .hero-actions .btn,.form-actions .btn{width:100%}
+  .hero-media__frame{aspect-ratio:16/10}
   .hero-stat{grid-template-columns:1fr}
+  .section{padding:50px 0}
+  .section-head{margin-bottom:24px}
+  .section-head h2,.section-title{font-size:clamp(27px,8vw,34px)}
+  .section-head p{font-size:15px}
   .option-grid,.field-grid,.field-grid--3,.requirement-grid,.portal-stepper,.stat-grid,.stat-grid--wide{grid-template-columns:1fr}
-  .stepper{gap:4px}
-  .stepper button{font-size:10px}
-  .wizard-card,.summary-card,.portal-card,.admin-card{padding:20px}
+  .wizard-card,.summary-card,.portal-card,.admin-card{padding:18px}
+  .wizard-card{overflow:hidden}
+  .stepper{display:flex;gap:8px;margin:0 -2px 24px;padding:0 2px 8px;overflow-x:auto;scroll-snap-type:x mandatory}
+  .stepper button{min-width:76px;padding:8px 6px;border:1px solid var(--line);border-radius:var(--radius);background:#0d1420;font-size:11px;scroll-snap-align:start}
+  .stepper .step-dot{width:30px;height:30px}
+  .wizard-step h3{font-size:21px}
+  .option-card{min-height:74px;padding:13px}
+  .field input,.field select,.field textarea,.input{min-height:48px;font-size:16px}
+  .summary-card__head{align-items:center}
+  .summary-row{padding:13px 0}
+  .pss-note{grid-template-columns:1fr;gap:4px}
+  .package-card{grid-template-rows:200px 1fr}
+  .package-card__media{height:200px;min-height:200px}
+  .package-card__body{padding:18px}
+  .luxury-grid{gap:26px}
+  .numbered__item{align-items:flex-start}
+  .numbered__item b{width:36px;height:36px}
+  .page-hero__media{aspect-ratio:16/9}
+  .process-grid{gap:10px;margin-bottom:20px}
+  .process-card{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;padding:16px}
+  .process-card b{margin:0}
+  .process-card h3,.process-card p{grid-column:2;min-width:0;overflow-wrap:anywhere}
+  .process-card b{grid-row:1 / span 2}
+  .split-layout>.sticky-panel{order:0}
+  .portal-top{display:grid;gap:14px}
+  .portal-top .btn{width:100%}
+  .portal-stepper{display:flex;gap:10px;overflow-x:auto;padding:12px;scroll-snap-type:x mandatory}
+  .portal-step{min-width:188px;padding:10px;border:1px solid var(--line);border-radius:var(--radius);background:#0d1420;scroll-snap-align:start}
+  .upload-row{display:grid;gap:12px}
+  .upload-row input[type=file]{max-width:none;width:100%;font-size:13px}
+  .status-pills{width:100%}
+  .status-pills .pill{flex:1 1 auto;justify-content:center}
+  .admin-title{align-items:flex-start}
+  .admin-title h1{font-size:26px}
   .countdown{flex-wrap:wrap}
   .footer-grid{grid-template-columns:1fr}
+}
+
+@media(max-width:380px){
+  .container{padding-left:14px;padding-right:14px}
+  .brand img:first-child{height:26px}
+  .brand img:last-child{height:18px}
+  .brand__divider{display:none}
+  .hero h1,.page-hero h1{font-size:36px}
+  .badge{white-space:normal;text-align:center}
+}
+
+@media(hover:none){
+  .btn:hover{transform:none}
 }

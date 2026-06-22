@@ -40,7 +40,18 @@ interface SummaryRow {
             <span class="currency">NG | EN | NGN</span>
             <a class="btn btn-primary" href="#planner">Build my trip</a>
           </div>
+          <button class="mobile-menu" type="button" [class.is-open]="mobileMenuOpen" [attr.aria-expanded]="mobileMenuOpen" aria-controls="home-mobile-menu" aria-label="Toggle menu" (click)="mobileMenuOpen = !mobileMenuOpen">
+            <span class="mobile-menu__bars" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="sr-only">Menu</span>
+          </button>
         </div>
+        <nav class="mobile-drawer" id="home-mobile-menu" [class.is-open]="mobileMenuOpen" [attr.aria-hidden]="!mobileMenuOpen" aria-label="Mobile navigation">
+          <a href="#planner" (click)="mobileMenuOpen = false">Build trip</a>
+          <a href="#packages" (click)="mobileMenuOpen = false">Packages</a>
+          <a href="#luxury" (click)="mobileMenuOpen = false">Luxury service</a>
+          <a routerLink="/visa" (click)="mobileMenuOpen = false">Visa</a>
+          <a class="mobile-drawer__cta" href="#planner" (click)="mobileMenuOpen = false">Build my trip</a>
+        </nav>
       </header>
 
       <main id="top">
@@ -288,6 +299,7 @@ export class HomeComponent {
   step = 1;
   tripStatus = '';
   luxuryStatus = '';
+  mobileMenuOpen = false;
 
   steps = [
     { n: 1, label: 'Flight' },

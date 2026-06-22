@@ -44,7 +44,7 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
             <div class="admin-title">
               <div>
                 <h1>Road to Toronto | Visa Admin</h1>
-                <p>Manage visa access requests, eligible applicant login access and submitted documents.</p>
+                <p>Preload approved applicant emails, manage login access and review submitted documents.</p>
               </div>
               <div style="display:flex;gap:10px;flex-wrap:wrap">
                 <button class="btn btn-ghost btn-small" type="button" (click)="downloadTemplate()">Download CSV template</button>
@@ -54,20 +54,20 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
             </div>
 
             <div class="stat-grid">
-              <div class="stat-card"><span>Applicant profiles</span><strong>{{ applicants.length }}</strong></div>
+              <div class="stat-card"><span>Preloaded emails</span><strong>{{ applicants.length }}</strong></div>
               <div class="stat-card"><span>Applications</span><strong>{{ applications.length }}</strong></div>
-              <div class="stat-card"><span>Uploaded documents</span><strong>{{ documentCount }}</strong></div>
+              <div class="stat-card"><span>Completed signups</span><strong>{{ completedSignupCount }}</strong></div>
             </div>
 
             <div class="admin-grid">
               <aside class="admin-card">
-                <h2>Add eligible applicant</h2>
-                <p style="margin:0 0 16px;color:var(--muted);font-size:13px">Admin-added applicants are active by default and can sign in with their access code.</p>
+                <h2>Preload approved email</h2>
+                <p style="margin:0 0 16px;color:var(--muted);font-size:13px">Only emails already listed here can sign up for visa access. Leave access code blank when the applicant should create it during signup.</p>
                 <form #addForm="ngForm" (ngSubmit)="addApplicant(addForm.valid)">
                   <label class="field"><span class="form-label">Name</span><input name="name" type="text" [(ngModel)]="newApplicant.name" required></label>
                   <label class="field" style="margin-top:12px"><span class="form-label">Email</span><input name="email" type="email" [(ngModel)]="newApplicant.email" required></label>
                   <label class="field" style="margin-top:12px"><span class="form-label">Phone</span><input name="phone" type="tel" [(ngModel)]="newApplicant.phone"></label>
-                  <label class="field" style="margin-top:12px"><span class="form-label">Access code</span><input name="accessCode" type="password" autocomplete="new-password" [(ngModel)]="newApplicant.accessCode" placeholder="Leave blank to auto-generate"></label>
+                  <label class="field" style="margin-top:12px"><span class="form-label">Access code</span><input name="accessCode" type="password" autocomplete="new-password" [(ngModel)]="newApplicant.accessCode" placeholder="Optional admin-issued code"></label>
                   <label class="field" style="margin-top:12px"><span class="form-label">Category</span>
                     <select name="category" [(ngModel)]="newApplicant.category">
                       <option value="">Unassigned</option>
@@ -77,17 +77,17 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                     </select>
                   </label>
                   <label class="field" style="margin-top:12px"><span class="form-label">Notes</span><textarea name="notes" [(ngModel)]="newApplicant.notes"></textarea></label>
-                  <button class="btn btn-blue btn-block" style="margin-top:16px" type="submit">Add applicant</button>
+                  <button class="btn btn-blue btn-block" style="margin-top:16px" type="submit">Preload email</button>
                   <p class="form-status" role="status">{{ addStatus }}</p>
                 </form>
 
                 <hr style="border:0;border-top:1px solid var(--line);margin:24px 0">
 
-                <h2>Import applicants</h2>
-                <p style="margin:0 0 14px;color:var(--muted);font-size:13px">Upload a CSV with columns: name, email, phone, accessCode, category, status, notes.</p>
+                <h2>Import allowlist</h2>
+                <p style="margin:0 0 14px;color:var(--muted);font-size:13px">Upload a CSV with approved emails. Columns: name, email, phone, accessCode, category, status, notes. Access code is optional.</p>
                 <form (ngSubmit)="importApplicants()">
                   <label class="field"><span class="form-label">CSV file</span><input name="eligibleCsv" type="file" accept=".csv,text/csv" (change)="setImportFile($event)" required></label>
-                  <button class="btn btn-secondary btn-block" style="margin-top:14px" type="submit">Import CSV</button>
+                  <button class="btn btn-secondary btn-block" style="margin-top:14px" type="submit">Import approved emails</button>
                   <p class="form-status" role="status">{{ importStatus }}</p>
                 </form>
               </aside>
@@ -96,15 +96,15 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                 <section class="admin-card">
                   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px">
                     <div>
-                      <h2>Applicant access list</h2>
-                      <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Pending sign-ups must be activated before applicants can sign in.</p>
+                      <h2>Visa email allowlist</h2>
+                      <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Signup is denied unless the applicant email is already preloaded here. Active applicants can sign in after setting or receiving an access code.</p>
                       <p class="form-status" role="status">{{ accessStatus }}</p>
                     </div>
                   </div>
-                  <div class="empty-state" *ngIf="!applicants.length">No applicant profiles yet.</div>
+                  <div class="empty-state" *ngIf="!applicants.length">No approved emails have been preloaded yet.</div>
                   <div class="table-wrap" *ngIf="applicants.length">
                     <table class="data-table">
-                      <thead><tr><th>Applicant</th><th>Email</th><th>Access code</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead>
+                      <thead><tr><th>Applicant</th><th>Email</th><th>Access code</th><th>Category</th><th>Status</th><th>Signup</th><th>Actions</th></tr></thead>
                       <tbody>
                         <tr *ngFor="let applicant of applicants">
                           <td><strong>{{ applicant.name || 'Unnamed' }}</strong><div>{{ applicant.phone }}</div></td>
@@ -122,6 +122,11 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                               <option value="active">active</option>
                               <option value="blocked">blocked</option>
                             </select>
+                          </td>
+                          <td>
+                            <span class="pill" [class.pill--ok]="applicant.signupCompletedAt" [class.pill--warn]="!applicant.signupCompletedAt">
+                              {{ applicant.signupCompletedAt ? 'Code set' : 'Awaiting signup' }}
+                            </span>
                           </td>
                           <td><button class="btn btn-ghost btn-small" type="button" (click)="removeApplicant(applicant)">Remove</button></td>
                         </tr>
@@ -230,6 +235,10 @@ export class AdminComponent implements OnInit {
     return this.applications.reduce((total, app) => total + this.countFiles(app), 0);
   }
 
+  get completedSignupCount(): number {
+    return this.applicants.filter((applicant) => Boolean(applicant.signupCompletedAt)).length;
+  }
+
   async login(valid: boolean | null): Promise<void> {
     if (!valid) return;
     if (this.passcode !== 'HEADIES2026') {
@@ -261,10 +270,10 @@ export class AdminComponent implements OnInit {
       this.addStatus = 'Complete the required fields.';
       return;
     }
-    this.addStatus = 'Adding applicant...';
+    this.addStatus = 'Preloading approved email...';
     await this.api.addEligible({ ...this.newApplicant, status: 'active' });
     this.newApplicant = { name: '', email: '', phone: '', accessCode: '', category: '', notes: '', status: 'active' };
-    this.addStatus = 'Applicant added.';
+    this.addStatus = 'Approved email preloaded.';
     await this.loadDashboard();
   }
 
@@ -316,7 +325,7 @@ export class AdminComponent implements OnInit {
         notes: row['notes'] || row['Notes'] || ''
       });
     }
-    this.importStatus = `${rows.length} applicants imported.`;
+    this.importStatus = `${rows.length} approved email${rows.length === 1 ? '' : 's'} imported.`;
     await this.loadDashboard();
   }
 
@@ -334,12 +343,12 @@ export class AdminComponent implements OnInit {
   }
 
   downloadTemplate(): void {
-    this.downloadText('visa-eligible-template.csv', 'name,email,phone,accessCode,category,status,notes\nExample Applicant,applicant@example.com,+2340000000000,HEADIES123,employed,active,');
+    this.downloadText('visa-email-allowlist-template.csv', 'name,email,phone,accessCode,category,status,notes\nExample Applicant,applicant@example.com,+2340000000000,,employed,active,Preloaded by admin');
   }
 
   exportEligibleCSV(): void {
-    const rows = [['name', 'email', 'phone', 'accessCode', 'category', 'status', 'notes']];
-    this.applicants.forEach((item) => rows.push([item.name, item.email, item.phone, item.accessCode || '', item.category, item.status, item.notes]));
+    const rows = [['name', 'email', 'phone', 'accessCode', 'category', 'status', 'signupCompletedAt', 'notes']];
+    this.applicants.forEach((item) => rows.push([item.name, item.email, item.phone, item.accessCode || '', item.category, item.status, item.signupCompletedAt || '', item.notes]));
     this.downloadText('headies-visa-eligible-applicants.csv', rows.map((row) => row.map(this.csvEscape).join(',')).join('\n'));
   }
 

@@ -44,7 +44,18 @@ interface UploadDoc {
           <div class="nav-actions">
             <a class="btn btn-primary" href="#apply">Start application</a>
           </div>
+          <button class="mobile-menu" type="button" [class.is-open]="mobileMenuOpen" [attr.aria-expanded]="mobileMenuOpen" aria-controls="visa-mobile-menu" aria-label="Toggle menu" (click)="mobileMenuOpen = !mobileMenuOpen">
+            <span class="mobile-menu__bars" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="sr-only">Menu</span>
+          </button>
         </div>
+        <nav class="mobile-drawer" id="visa-mobile-menu" [class.is-open]="mobileMenuOpen" [attr.aria-hidden]="!mobileMenuOpen" aria-label="Mobile navigation">
+          <a routerLink="/" fragment="planner" (click)="mobileMenuOpen = false">Build trip</a>
+          <a routerLink="/" fragment="packages" (click)="mobileMenuOpen = false">Packages</a>
+          <a routerLink="/" fragment="luxury" (click)="mobileMenuOpen = false">Luxury service</a>
+          <a class="is-active" routerLink="/visa" (click)="mobileMenuOpen = false">Visa</a>
+          <a class="mobile-drawer__cta" href="#apply" (click)="mobileMenuOpen = false">Start application</a>
+        </nav>
       </header>
 
       <main>
@@ -299,6 +310,7 @@ interface UploadDoc {
 })
 export class VisaComponent implements OnInit {
   authMode: 'login' | 'signup' = 'login';
+  mobileMenuOpen = false;
   portalVisible = false;
   loginStatus = '';
   signupStatus = '';
@@ -482,12 +494,12 @@ export class VisaComponent implements OnInit {
         category: this.signupModel.category,
         notes: this.signupModel.notes
       });
-      if (applicant.status === 'active') this.signupStatus = 'Your profile is already active. Use sign in with your access code.';
+      if (applicant.status === 'active') this.signupStatus = 'Your approved profile is ready. Sign in with your access code.';
       else if (applicant.status === 'blocked') this.signupStatus = 'This profile cannot request access. Contact the visa admin team.';
       else this.signupStatus = 'Access request received. Use your chosen code after admin approval.';
       if (applicant.status === 'pending') this.signupModel = { name: '', email: '', phone: '', accessCode: '', confirmAccessCode: '', category: '', notes: '' };
     } catch (error) {
-      this.signupStatus = 'Could not submit access request.';
+      this.signupStatus = error instanceof Error ? error.message : 'Could not submit access request.';
     }
   }
 

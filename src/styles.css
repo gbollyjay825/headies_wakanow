@@ -496,3 +496,109 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media(max-width:760px) {
+  .visa-apply-layout.split-layout--full .process-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .visa-apply-layout.split-layout--full .requirements-card {
+    padding: 20px;
+  }
+
+  .visa-apply-layout.split-layout--full .requirements-card .requirement-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .requirements-card__intro .section-title {
+    font-size: 24px !important;
+    line-height: 1.16;
+  }
+
+  .application-flow {
+    gap: 14px;
+  }
+
+  .payment-card {
+    padding: 18px;
+    gap: 18px;
+  }
+
+  .payment-card__copy h2 {
+    font-size: 22px;
+  }
+
+  .payment-card__due strong {
+    font-size: clamp(31px, 10vw, 42px);
+    overflow-wrap: anywhere;
+  }
+
+  .payment-card__link {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    color: #dbe9ff;
+  }
+
+  .upload-section {
+    padding: 18px;
+  }
+
+  .upload-section__header {
+    gap: 10px;
+  }
+
+  .passport-intake {
+    padding: 16px;
+  }
+
+  .passport-intake h3 {
+    font-size: 18px;
+  }
+
+  .passport-intake__control input[type="file"],
+  .upload-row input[type="file"] {
+    min-height: 46px;
+    padding: 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #0b111b;
+  }
+
+  .passport-fields div {
+    padding: 11px;
+  }
+
+  .progress-panel {
+    gap: 14px;
+  }
+
+  .progress-panel__head h3 {
+    font-size: 19px;
+  }
+
+  .review-check {
+    padding: 13px;
+  }
+}
+
+@media(max-width:520px) {
+  .payment-card__meta,
+  .upload-progress__meta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .payment-card__meta .pill {
+    width: max-content;
+  }
+
+  .progress-list {
+    gap: 8px;
+  }
+
+  .access-code-cell {
+    min-width: 0;
+  }
+}

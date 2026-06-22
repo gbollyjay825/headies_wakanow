@@ -26,10 +26,13 @@ create table if not exists visa_eligible_applicants (
   access_code text not null,
   category text not null default '',
   status text not null default 'active',
+  source text not null default 'admin',
   notes text not null default '',
+  signup_completed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint visa_eligible_status_check check (status in ('pending', 'active', 'blocked'))
+  constraint visa_eligible_status_check check (status in ('pending', 'active', 'blocked')),
+  constraint visa_eligible_source_check check (source in ('admin', 'signup'))
 );
 
 create index if not exists visa_eligible_status_updated_idx
@@ -37,6 +40,14 @@ create index if not exists visa_eligible_status_updated_idx
 
 do $$
 begin
+  alter table visa_eligible_applicants
+    add column if not exists source text not null default 'admin',
+    add column if not exists signup_completed_at timestamptz;
+
+  update visa_eligible_applicants
+    set source = 'admin'
+    where source is null or source = '';
+
   if exists (
     select 1 from pg_constraint
     where conname = 'visa_eligible_status_check'
@@ -48,6 +59,18 @@ begin
   alter table visa_eligible_applicants
     add constraint visa_eligible_status_check
     check (status in ('pending', 'active', 'blocked'));
+
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'visa_eligible_source_check'
+      and conrelid = 'visa_eligible_applicants'::regclass
+  ) then
+    alter table visa_eligible_applicants drop constraint visa_eligible_source_check;
+  end if;
+
+  alter table visa_eligible_applicants
+    add constraint visa_eligible_source_check
+    check (source in ('admin', 'signup'));
 end $$;
 
 create table if not exists visa_applications (

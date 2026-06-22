@@ -30,6 +30,13 @@ function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+function preloadedEmailRequiredError() {
+  const error = new Error('This email is not on the approved visa access list. Ask the admin team to preload it before signing up.');
+  error.code = 'EMAIL_NOT_PRELOADED';
+  error.status = 403;
+  return error;
+}
+
 function iso(value) {
   if (!value) return '';
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
@@ -60,7 +67,9 @@ function toEligible(row) {
     accessCode: row.access_code,
     category: row.category,
     status: row.status,
+    source: row.source || 'admin',
     notes: row.notes,
+    signupCompletedAt: row.signup_completed_at ? iso(row.signup_completed_at) : '',
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at)
   };
@@ -213,27 +222,32 @@ async function upsertEligibleRecordsPg(records) {
   for (const record of records) {
     const email = normalizeEmail(record.email || record.Email);
     if (!email) continue;
+    const explicitAccessCode = String(record.accessCode || record.AccessCode || record.code || record.Code || '').trim();
+    const accessCode = explicitAccessCode || makeAccessCode();
     await pool.query(
       `insert into visa_eligible_applicants
-        (id, name, email, phone, access_code, category, status, notes, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())
+        (id, name, email, phone, access_code, category, status, source, notes, signup_completed_at, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $6, $7, 'admin', $8, $9::timestamptz, now(), now())
        on conflict (email) do update set
         name = coalesce(nullif(excluded.name, ''), visa_eligible_applicants.name),
         phone = coalesce(nullif(excluded.phone, ''), visa_eligible_applicants.phone),
         access_code = coalesce(nullif(excluded.access_code, ''), visa_eligible_applicants.access_code),
         category = coalesce(nullif(excluded.category, ''), visa_eligible_applicants.category),
         status = coalesce(nullif(excluded.status, ''), visa_eligible_applicants.status),
+        source = 'admin',
         notes = coalesce(nullif(excluded.notes, ''), visa_eligible_applicants.notes),
+        signup_completed_at = coalesce(excluded.signup_completed_at, visa_eligible_applicants.signup_completed_at),
         updated_at = now()`,
       [
         record.id || makeId('elig'),
         String(record.name || record.Name || ''),
         email,
         String(record.phone || record.Phone || ''),
-        String(record.accessCode || record.AccessCode || record.code || record.Code || makeAccessCode()).trim(),
+        accessCode,
         String(record.category || record.Category || ''),
         String(record.status || record.Status || 'active'),
-        String(record.notes || record.Notes || '')
+        String(record.notes || record.Notes || ''),
+        explicitAccessCode ? now() : null
       ]
     );
   }
@@ -245,33 +259,32 @@ async function signupApplicantPg(record) {
   if (!email) throw new Error('Email is required.');
   const accessCode = String(record.accessCode || record.AccessCode || record.code || record.Code || '').trim();
   if (accessCode.length < 6) throw new Error('Access code must be at least 6 characters.');
+  const existingResult = await pool.query('select * from visa_eligible_applicants where email = $1 limit 1', [email]);
+  if (!existingResult.rows[0]) throw preloadedEmailRequiredError();
+  const existing = existingResult.rows[0];
+  if (existing.status === 'blocked') return toEligible(existing);
+  const preserveExistingCode = Boolean(existing.signup_completed_at);
+
   const result = await pool.query(
-    `insert into visa_eligible_applicants
-      (id, name, email, phone, access_code, category, status, notes, created_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, 'pending', $7, now(), now())
-     on conflict (email) do update set
-      name = coalesce(nullif(excluded.name, ''), visa_eligible_applicants.name),
-      phone = coalesce(nullif(excluded.phone, ''), visa_eligible_applicants.phone),
-      access_code = case
-        when visa_eligible_applicants.status in ('active', 'blocked') then visa_eligible_applicants.access_code
-        else coalesce(nullif(excluded.access_code, ''), visa_eligible_applicants.access_code)
-      end,
-      category = coalesce(nullif(excluded.category, ''), visa_eligible_applicants.category),
-      notes = coalesce(nullif(excluded.notes, ''), visa_eligible_applicants.notes),
-      status = case
-        when visa_eligible_applicants.status in ('active', 'blocked') then visa_eligible_applicants.status
-        else 'pending'
-      end,
-      updated_at = now()
+    `update visa_eligible_applicants
+     set name = coalesce(nullif($2, ''), name),
+         phone = coalesce(nullif($3, ''), phone),
+         access_code = case when $7::boolean then access_code else $4 end,
+         category = coalesce(nullif($5, ''), category),
+         notes = coalesce(nullif($6, ''), notes),
+         source = 'admin',
+         signup_completed_at = coalesce(signup_completed_at, now()),
+         updated_at = now()
+     where email = $1
      returning *`,
     [
-      record.id || makeId('elig'),
-      String(record.name || '').trim(),
       email,
+      String(record.name || '').trim(),
       String(record.phone || '').trim(),
       accessCode,
       String(record.category || '').trim(),
-      String(record.notes || '').trim()
+      String(record.notes || '').trim(),
+      preserveExistingCode
     ]
   );
   return toEligible(result.rows[0]);
@@ -298,6 +311,7 @@ async function updateEligiblePg(id, fields) {
          category = coalesce($5, category),
          status = coalesce($6, status),
          notes = coalesce($7, notes),
+         signup_completed_at = case when $4 is null then signup_completed_at else coalesce(signup_completed_at, now()) end,
          updated_at = now()
      where id = $1
      returning *`,
@@ -518,7 +532,11 @@ async function updateRequestJson(id, fields) {
 }
 
 async function listEligibleJson() {
-  return jsonStore().eligibleApplicants;
+  return jsonStore().eligibleApplicants.map((item) => ({
+    source: 'admin',
+    signupCompletedAt: '',
+    ...item
+  }));
 }
 
 async function upsertEligibleRecordsJson(records) {
@@ -527,15 +545,18 @@ async function upsertEligibleRecordsJson(records) {
     const email = normalizeEmail(record.email || record.Email);
     if (!email) return;
     const existing = store.eligibleApplicants.find((item) => normalizeEmail(item.email) === email);
+    const explicitAccessCode = String(record.accessCode || record.AccessCode || record.code || record.Code || '').trim();
     const next = {
       id: existing ? existing.id : makeId('elig'),
       name: String(record.name || record.Name || (existing && existing.name) || '').trim(),
       email,
       phone: String(record.phone || record.Phone || (existing && existing.phone) || '').trim(),
-      accessCode: String(record.accessCode || record.AccessCode || record.code || record.Code || (existing && existing.accessCode) || makeAccessCode()).trim(),
+      accessCode: String(explicitAccessCode || (existing && existing.accessCode) || makeAccessCode()).trim(),
       category: String(record.category || record.Category || (existing && existing.category) || '').trim(),
       status: String(record.status || record.Status || (existing && existing.status) || 'active').trim() || 'active',
+      source: 'admin',
       notes: String(record.notes || record.Notes || (existing && existing.notes) || '').trim(),
+      signupCompletedAt: explicitAccessCode ? now() : ((existing && existing.signupCompletedAt) || ''),
       createdAt: existing ? existing.createdAt : now(),
       updatedAt: now()
     };
@@ -553,20 +574,24 @@ async function signupApplicantJson(record) {
   if (accessCode.length < 6) throw new Error('Access code must be at least 6 characters.');
   const store = jsonStore();
   const existing = store.eligibleApplicants.find((item) => normalizeEmail(item.email) === email);
+  if (!existing) throw preloadedEmailRequiredError();
+  if (existing.status === 'blocked') return existing;
+  const preserveExistingCode = Boolean(existing.signupCompletedAt);
   const next = {
-    id: existing ? existing.id : makeId('elig'),
+    id: existing.id,
     name: String(record.name || (existing && existing.name) || '').trim(),
     email,
     phone: String(record.phone || (existing && existing.phone) || '').trim(),
-    accessCode: existing && (existing.status === 'active' || existing.status === 'blocked') ? existing.accessCode : accessCode,
+    accessCode: preserveExistingCode ? existing.accessCode : accessCode,
     category: String(record.category || (existing && existing.category) || '').trim(),
-    status: existing && (existing.status === 'active' || existing.status === 'blocked') ? existing.status : 'pending',
+    status: existing.status || 'active',
+    source: 'admin',
     notes: String(record.notes || (existing && existing.notes) || '').trim(),
-    createdAt: existing ? existing.createdAt : now(),
+    signupCompletedAt: existing.signupCompletedAt || now(),
+    createdAt: existing.createdAt || now(),
     updatedAt: now()
   };
-  if (existing) Object.assign(existing, next);
-  else store.eligibleApplicants.push(next);
+  Object.assign(existing, next);
   writeStore(store);
   return next;
 }
@@ -584,6 +609,7 @@ async function updateEligibleJson(id, fields) {
   const item = store.eligibleApplicants.find((record) => record.id === id);
   if (!item) return null;
   Object.assign(item, fields, { updatedAt: now() });
+  if (fields.accessCode != null && !item.signupCompletedAt) item.signupCompletedAt = now();
   writeStore(store);
   return item;
 }

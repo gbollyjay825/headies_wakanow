@@ -24,7 +24,9 @@ export interface EligibleApplicant {
   accessCode?: string;
   category: string;
   status: 'pending' | 'active' | 'blocked';
+  source?: 'admin' | 'signup';
   notes: string;
+  signupCompletedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }
