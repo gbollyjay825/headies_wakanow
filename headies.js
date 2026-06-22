@@ -205,65 +205,99 @@
     });
   }
 
-  /* ---------- page-load flyover ---------- */
-  function initFlyover(){
-    var flyover=document.querySelector('[data-flyover]');
-    if(!flyover)return;
-    var close=flyover.querySelector('[data-flyover-close]');
-    var doneTimer=null;
-    function dismiss(){
-      if(!flyover.classList.contains('is-active'))return;
-      flyover.classList.add('is-closing');
-      flyover.classList.remove('is-active');
-      flyover.setAttribute('aria-hidden','true');
-      if(doneTimer)clearTimeout(doneTimer);
-      setTimeout(function(){ flyover.classList.remove('is-closing'); },420);
+  /* ---------- travel lead capture ---------- */
+  function setupVisaPanel(form){
+    var visaToggle=form.querySelector('input[name="services"][value="Visa Support"]');
+    var panel=form.querySelector('[data-visa-panel]');
+    if(!visaToggle||!panel)return {active:function(){return false;},collect:function(){return null;}};
+    var applicantType=panel.querySelector('[name="visaApplicantType"]');
+    var employedBlock=panel.querySelector('[data-visa-conditional="employed"]');
+    var businessBlock=panel.querySelector('[data-visa-conditional="business-owner"]');
+    function setEnabled(control,enabled){
+      control.disabled=!enabled;
+      control.required=enabled && control.getAttribute('data-visa-required')==='true';
+      if(!enabled)control.required=false;
     }
-    function show(){
-      if(flyover.dataset.flyoverShown)return;
-      flyover.dataset.flyoverShown='true';
-      flyover.classList.add('is-active');
-      flyover.setAttribute('aria-hidden','false');
-      doneTimer=setTimeout(dismiss,7200);
+    function setBlock(block,enabled){
+      if(!block)return;
+      block.hidden=!enabled;
+      if(enabled&&typeof block.open==='boolean')block.open=true;
+      block.querySelectorAll('[data-visa-field]').forEach(function(control){setEnabled(control,enabled);});
     }
-    if(close)close.addEventListener('click',dismiss);
-    document.addEventListener('keydown',function(e){
-      if(e.key==='Escape'&&flyover.classList.contains('is-active'))dismiss();
-    });
-    if(document.readyState==='complete')requestAnimationFrame(show);
-    else window.addEventListener('load',show,{once:true});
+    function sync(){
+      var active=visaToggle.checked;
+      panel.hidden=!active;
+      panel.querySelectorAll('[data-visa-field]').forEach(function(control){
+        if(control.closest('[data-visa-conditional]'))return;
+        setEnabled(control,active);
+      });
+      var type=applicantType ? applicantType.value : '';
+      setBlock(employedBlock,active&&(type==='employed'||type==='employed-business-owner'));
+      setBlock(businessBlock,active&&(type==='business-owner'||type==='employed-business-owner'));
+    }
+    function checkedValues(name){
+      return Array.prototype.slice.call(form.querySelectorAll('input[name="'+name+'"]:checked')).map(function(input){return input.value;});
+    }
+    function activate(){
+      visaToggle.checked=true;
+      sync();
+    }
+    function collect(){
+      if(!visaToggle.checked)return null;
+      function value(name){
+        var field=form.elements[name];
+        return field&&!field.disabled ? field.value.trim() : '';
+      }
+      function checked(name){
+        var field=form.elements[name];
+        return !!(field&&!field.disabled&&field.checked);
+      }
+      return {
+        service:'Canada Business Visa',
+        fee:'NGN350,000 per applicant',
+        portalStatus:'Document upload page available at visa.html',
+        applicants:value('visaApplicants'),
+        applicantCategory:value('visaApplicantType'),
+        passportExpiry:value('visaPassportExpiry'),
+        travelHistory:value('visaTravelHistory'),
+        notes:value('visaNotes'),
+        role:value('visaRole'),
+        salary:value('visaSalary'),
+        employmentLength:value('visaEmploymentLength'),
+        leaveApproved:checked('visaLeaveApproved'),
+        returnToJob:checked('visaReturnToJob'),
+        feeAccepted:checked('visaFeeAccepted'),
+        portalPendingAccepted:checked('visaPortalPending'),
+        documentReadiness:{
+          general:checkedValues('visaReadyGeneral'),
+          employed:checkedValues('visaReadyEmployed'),
+          business:checkedValues('visaReadyBusiness')
+        }
+      };
+    }
+    visaToggle.addEventListener('change',sync);
+    if(applicantType)applicantType.addEventListener('change',sync);
+    sync();
+    return {active:function(){return visaToggle.checked;},activate:activate,collect:collect,sync:sync};
   }
 
-  /* ---------- early-access capture ---------- */
-  function initEarlyAccess(){
-    document.querySelectorAll('[data-early-access-form]').forEach(function(form){
-      var status=form.querySelector('[role="status"]');
-      form.addEventListener('submit',function(e){
-        e.preventDefault();
-        if(!form.checkValidity()){
-          form.reportValidity();
-          return;
-        }
-        var lead={
-          name:form.elements.name ? form.elements.name.value.trim() : '',
-          email:form.elements.email ? form.elements.email.value.trim() : '',
-          phone:form.elements.phone ? form.elements.phone.value.trim() : '',
-          source:location.pathname,
-          createdAt:new Date().toISOString()
-        };
-        try{
-          var leads=JSON.parse(localStorage.getItem('headiesTravelLeads')||'[]');
-          leads.push(lead);
-          localStorage.setItem('headiesTravelLeads',JSON.stringify(leads.slice(-50)));
-        }catch(err){}
-        if(status)status.textContent="You're on the list. We will share package deals as soon as they open.";
-        form.reset();
-      });
-    });
+  function initWhiteGlove(){
     document.querySelectorAll('[data-white-glove-form]').forEach(function(form){
       var status=form.querySelector('[role="status"]');
+      var visaPanel=setupVisaPanel(form);
+      function activateVisaFromCta(){
+        if(visaPanel.activate)visaPanel.activate();
+      }
+      document.querySelectorAll('a[href="#visa-request"]').forEach(function(link){
+        link.addEventListener('click',activateVisaFromCta);
+      });
+      if(window.location.hash==='#visa-request')activateVisaFromCta();
+      window.addEventListener('hashchange',function(){
+        if(window.location.hash==='#visa-request')activateVisaFromCta();
+      });
       form.addEventListener('submit',function(e){
         e.preventDefault();
+        if(visaPanel.sync)visaPanel.sync();
         if(!form.checkValidity()){
           form.reportValidity();
           return;
@@ -279,6 +313,7 @@
           phone:form.elements.phone ? form.elements.phone.value.trim() : '',
           services:services,
           notes:form.elements.notes ? form.elements.notes.value.trim() : '',
+          visa:visaPanel.collect ? visaPanel.collect() : null,
           source:location.pathname,
           createdAt:new Date().toISOString()
         };
@@ -287,9 +322,267 @@
           requests.push(request);
           localStorage.setItem('headiesWhiteGloveRequests',JSON.stringify(requests.slice(-50)));
         }catch(err){}
-        if(status)status.textContent='Exclusive luxury service request received. A travel concierge will follow up with next steps.';
+        if(status)status.textContent=services.indexOf('Visa Support')>-1
+          ? 'Visa support request received. Use the visa upload page to submit applicant documents.'
+          : 'Exclusive luxury service request received. A travel concierge will follow up with next steps.';
         form.reset();
+        if(visaPanel.sync)visaPanel.sync();
       });
+    });
+  }
+
+  function initTravelFlow(){
+    document.querySelectorAll('[data-travel-flow-form]').forEach(function(form){
+      var carToggle=form.querySelector('[data-car-rental-toggle]');
+      var carFields=form.querySelector('[data-car-rental-fields]');
+      var summary=form.querySelector('[data-trip-summary]');
+      var status=form.querySelector('[role="status"]');
+      var flightType=form.elements.flightType;
+      var flightClass=form.elements.flightClass;
+
+      function value(name){
+        var field=form.elements[name];
+        if(!field)return '';
+        if(field.type==='checkbox')return field.checked;
+        return field.value;
+      }
+      function setCarRentalState(){
+        var enabled=!!(carToggle&&carToggle.checked);
+        if(carFields)carFields.hidden=!enabled;
+        if(carFields){
+          carFields.querySelectorAll('input,select').forEach(function(field){
+            field.disabled=!enabled;
+            field.required=enabled&&(field.name==='carType'||field.name==='carRentalDays');
+            if(!enabled){field.required=false;field.value='';}
+          });
+        }
+      }
+      function setFlightState(){
+        if(!flightType||!flightClass)return;
+        if(flightType.value==='Private Jet'){
+          flightClass.value='Private Jet';
+        }
+        if(flightType.value==='No Flight Needed'){
+          flightClass.required=false;
+          flightClass.value='';
+        }else{
+          flightClass.required=true;
+        }
+      }
+      function updateSummary(){
+        if(!summary)return;
+        var parts=[];
+        if(value('flightType'))parts.push(value('flightType')+(value('flightClass')?' · '+value('flightClass'):''));
+        if(value('accommodation'))parts.push(value('accommodation')+(value('hotelClass')?' · '+value('hotelClass'):''));
+        if(value('airportTransfer'))parts.push(value('airportTransfer'));
+        if(value('carRentalNeeded'))parts.push('Car rental · '+(value('carType')||'Vehicle pending')+(value('carRentalDays')?' · '+value('carRentalDays')+' days':''));
+        if(value('needsVisa'))parts.push('Visa support');
+        summary.innerHTML='<strong>Trip summary:</strong> '+(parts.length?parts.join(' / '):'Select your travel options to build a request.');
+      }
+      function sync(){
+        setCarRentalState();
+        setFlightState();
+        updateSummary();
+      }
+      form.addEventListener('input',sync);
+      form.addEventListener('change',sync);
+      form.addEventListener('submit',function(e){
+        e.preventDefault();
+        sync();
+        if(!form.checkValidity()){
+          form.reportValidity();
+          return;
+        }
+        var plan={
+          name:value('name').trim(),
+          email:value('email').trim(),
+          phone:value('phone').trim(),
+          flight:{
+            type:value('flightType'),
+            class:value('flightClass'),
+            departureDate:value('flightDepartureDate'),
+            returnDate:value('flightReturnDate')
+          },
+          accommodation:{
+            type:value('accommodation'),
+            hotelClass:value('hotelClass'),
+            checkIn:value('hotelCheckIn'),
+            checkOut:value('hotelCheckOut')
+          },
+          airportTransfer:{
+            type:value('airportTransfer'),
+            passengers:value('transferPassengers'),
+            arrivalDate:value('arrivalTransferDate'),
+            departureDate:value('departureTransferDate')
+          },
+          carRental:{
+            needed:!!value('carRentalNeeded'),
+            type:value('carType'),
+            days:value('carRentalDays'),
+            pickupDate:value('carPickupDate'),
+            returnDate:value('carReturnDate')
+          },
+          needsVisa:!!value('needsVisa'),
+          notes:value('notes').trim(),
+          source:location.pathname,
+          createdAt:new Date().toISOString()
+        };
+        try{
+          var plans=JSON.parse(localStorage.getItem('headiesTravelPlans')||'[]');
+          plans.push(plan);
+          localStorage.setItem('headiesTravelPlans',JSON.stringify(plans.slice(-50)));
+        }catch(err){}
+        if(status)status.textContent='Travel request received. Wakanow will follow up with options for the selected segments.';
+        form.reset();
+        sync();
+      });
+      sync();
+    });
+  }
+
+  function initVisaUploadPortal(){
+    document.querySelectorAll('[data-visa-upload-form]').forEach(function(form){
+      var applicantType=form.querySelector('[data-visa-applicant-type]');
+      var progress=form.querySelector('[data-upload-progress]');
+      var progressBar=form.querySelector('[data-upload-progress-bar]');
+      var progressCount=form.querySelector('[data-upload-progress-count]');
+      var status=form.querySelector('[role="status"]');
+
+      function formatBytes(bytes){
+        if(!bytes)return '0 KB';
+        if(bytes<1048576)return Math.max(1,Math.round(bytes/1024))+' KB';
+        return (bytes/1048576).toFixed(bytes<10485760?1:0)+' MB';
+      }
+
+      function sectionEnabled(section){
+        if(!section)return true;
+        var target=section.getAttribute('data-applicant-section');
+        var value=applicantType ? applicantType.value : '';
+        if(target==='employed')return value==='employed'||value==='employed-business-owner';
+        if(target==='business-owner')return value==='business-owner'||value==='employed-business-owner';
+        return true;
+      }
+
+      function setRequiredState(control,enabled){
+        control.disabled=!enabled;
+        control.required=enabled && control.getAttribute('data-required')==='true';
+        if(!enabled)control.required=false;
+      }
+
+      function syncConditional(){
+        form.querySelectorAll('[data-applicant-section]').forEach(function(section){
+          var enabled=sectionEnabled(section);
+          section.hidden=!enabled;
+          section.querySelectorAll('input,select,textarea').forEach(function(control){setRequiredState(control,enabled);});
+        });
+        form.querySelectorAll('[data-upload-input]').forEach(function(input){
+          if(input.closest('[data-applicant-section]'))return;
+          setRequiredState(input,true);
+        });
+        updateProgress();
+      }
+
+      function renderFileList(input){
+        var card=input.closest('[data-upload-card]');
+        if(!card)return;
+        var list=card.querySelector('[data-upload-list]');
+        var files=Array.prototype.slice.call(input.files||[]);
+        card.classList.toggle('is-complete',files.length>0);
+        if(!list)return;
+        list.innerHTML='';
+        if(!files.length)return;
+        files.forEach(function(file){
+          var item=document.createElement('li');
+          var name=document.createElement('span');
+          var size=document.createElement('span');
+          name.textContent=file.name;
+          size.textContent=formatBytes(file.size);
+          item.appendChild(name);
+          item.appendChild(size);
+          list.appendChild(item);
+        });
+      }
+
+      function visibleRequiredUploads(){
+        return Array.prototype.slice.call(form.querySelectorAll('[data-upload-input]')).filter(function(input){
+          return !input.disabled && input.required;
+        });
+      }
+
+      function updateProgress(){
+        form.querySelectorAll('[data-upload-input]').forEach(renderFileList);
+        var required=visibleRequiredUploads();
+        var complete=required.filter(function(input){return input.files&&input.files.length>0;}).length;
+        var pct=required.length ? Math.round((complete/required.length)*100) : 100;
+        if(progress)progress.setAttribute('aria-valuenow',String(pct));
+        if(progressBar)progressBar.style.width=pct+'%';
+        if(progressCount)progressCount.textContent=complete+' of '+required.length+' required uploads ready';
+      }
+
+      function selectedFiles(input){
+        return Array.prototype.slice.call(input.files||[]).map(function(file){
+          return {name:file.name,size:file.size,type:file.type||'unknown'};
+        });
+      }
+
+      function collectUploads(){
+        return Array.prototype.slice.call(form.querySelectorAll('[data-upload-input]')).filter(function(input){
+          return !input.disabled;
+        }).map(function(input){
+          return {
+            field:input.name,
+            document:input.getAttribute('data-upload-name')||input.name,
+            required:input.required,
+            files:selectedFiles(input)
+          };
+        });
+      }
+
+      form.querySelectorAll('[data-upload-input]').forEach(function(input){
+        input.addEventListener('change',updateProgress);
+      });
+      if(applicantType)applicantType.addEventListener('change',syncConditional);
+
+      form.addEventListener('submit',function(e){
+        e.preventDefault();
+        syncConditional();
+        if(!form.checkValidity()){
+          form.reportValidity();
+          updateProgress();
+          return;
+        }
+        var application={
+          name:form.elements.name ? form.elements.name.value.trim() : '',
+          email:form.elements.email ? form.elements.email.value.trim() : '',
+          phone:form.elements.phone ? form.elements.phone.value.trim() : '',
+          applicants:form.elements.applicants ? form.elements.applicants.value : '',
+          applicantCategory:applicantType ? applicantType.value : '',
+          passportExpiry:form.elements.passportExpiry ? form.elements.passportExpiry.value : '',
+          travelDate:form.elements.travelDate ? form.elements.travelDate.value : '',
+          travelHistory:form.elements.travelHistory ? form.elements.travelHistory.value.trim() : '',
+          role:form.elements.role ? form.elements.role.value.trim() : '',
+          salary:form.elements.salary ? form.elements.salary.value.trim() : '',
+          employmentLength:form.elements.employmentLength ? form.elements.employmentLength.value.trim() : '',
+          notes:form.elements.notes ? form.elements.notes.value.trim() : '',
+          uploads:collectUploads(),
+          fee:'NGN350,000 per applicant',
+          destinationEmail:'visa@wakanow.com',
+          source:location.pathname,
+          createdAt:new Date().toISOString()
+        };
+        try{
+          var applications=JSON.parse(localStorage.getItem('headiesVisaApplications')||'[]');
+          applications.push(application);
+          localStorage.setItem('headiesVisaApplications',JSON.stringify(applications.slice(-25)));
+        }catch(err){}
+        if(status)status.textContent='Visa application details and selected document names have been captured. Wakanow will follow up with payment and processing steps.';
+        form.reset();
+        syncConditional();
+        updateProgress();
+      });
+
+      syncConditional();
+      updateProgress();
     });
   }
 
@@ -301,6 +594,6 @@
 
   window.addEventListener('headies:lucide-ready',initIcons);
 
-  function boot(){ initNav();initReveal();initCountUp();initCountdown();initLightbox();initCarousel();initTimelineDrag();initFlyover();initEarlyAccess();initIcons(); }
+  function boot(){ initNav();initReveal();initCountUp();initCountdown();initLightbox();initCarousel();initTimelineDrag();initWhiteGlove();initTravelFlow();initVisaUploadPortal();initIcons(); }
   if(document.readyState!=='loading')boot(); else document.addEventListener('DOMContentLoaded',boot);
 })();

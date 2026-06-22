@@ -1,0 +1,498 @@
+.readonly-field {
+  opacity: .78;
+}
+
+.app-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  color: #97a6ba;
+  background: #070b12;
+}
+
+.summary-row__label {
+  display: block;
+}
+
+.app-error {
+  color: #ffb2b2;
+}
+
+.access-code-cell {
+  display: grid;
+  gap: 8px;
+  min-width: 170px;
+}
+
+.access-code-cell .input {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.visa-apply-layout.split-layout--full {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1480px;
+}
+
+.visa-apply-layout.split-layout--full > div {
+  min-width: 0;
+}
+
+.visa-apply-layout.split-layout--full .process-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.requirements-card {
+  padding: 28px;
+}
+
+.requirements-card__intro {
+  min-width: 0;
+}
+
+.visa-apply-layout.split-layout--full .requirements-card {
+  display: grid;
+  grid-template-columns: minmax(280px, .58fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.visa-apply-layout.split-layout--full .requirements-card .requirement-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.visa-apply-layout.split-layout--full .requirement {
+  min-height: 76px;
+  align-items: flex-start;
+}
+
+.luxury-plane {
+  position: relative;
+  margin: 36px 0 0;
+  width: min(70%, 476px);
+  background: transparent;
+}
+
+.luxury-plane::after {
+  content: none;
+}
+
+.luxury-plane img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+}
+
+.package-card:first-child .package-card__media img {
+  object-position: center 52%;
+}
+
+.application-flow {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.payment-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 330px);
+  gap: 24px;
+  align-items: stretch;
+  padding: 28px;
+  overflow: hidden;
+}
+
+.payment-card.is-paid {
+  border-color: rgba(55, 194, 118, .38);
+}
+
+.payment-card__copy {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+}
+
+.payment-card__copy h2 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  line-height: 1.14;
+}
+
+.payment-card__copy p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.payment-card__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-top: 18px;
+}
+
+.payment-card__meta small {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.payment-card__due {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+  padding: 20px 0 20px 24px;
+  border-left: 1px solid var(--line-strong);
+}
+
+.payment-card__due > span {
+  color: #ffd58a;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.payment-card__due strong {
+  display: block;
+  color: var(--text);
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.05;
+}
+
+.payment-card__due small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.payment-card__link {
+  width: max-content;
+  border: 0;
+  background: transparent;
+  color: #cae0ff;
+  padding: 2px 0;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.payment-card__link:hover {
+  color: var(--text);
+}
+
+.upload-section {
+  padding: 28px;
+}
+
+.upload-section__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.upload-section__header h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.upload-section__header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.upload-section__header strong {
+  color: var(--text);
+}
+
+.upload-section__header span:not(.badge) {
+  display: block;
+  margin-top: 4px;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.progress-panel {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.progress-panel__head {
+  display: grid;
+  gap: 8px;
+}
+
+.progress-panel__head .badge {
+  width: max-content;
+}
+
+.progress-panel__head h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.progress-panel__head p,
+.progress-meter small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.progress-meter {
+  display: grid;
+  gap: 9px;
+}
+
+.progress-list {
+  display: grid;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.progress-list div {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.progress-list b {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: #0d1420;
+}
+
+.progress-list div.is-complete {
+  color: #dff9e9;
+}
+
+.progress-list div.is-complete b {
+  border-color: rgba(55, 194, 118, .56);
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(55, 194, 118, .12);
+}
+
+.review-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(121, 173, 255, .26);
+  border-radius: var(--radius);
+  background: rgba(121, 173, 255, .08);
+  color: #dbe6f6;
+  cursor: pointer;
+}
+
+.review-check input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--green);
+}
+
+.review-check span {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+  transform: none;
+}
+
+.passport-intake {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 18px;
+  align-items: start;
+  margin: 0 0 22px;
+  padding: 18px;
+  border: 1px solid rgba(121, 173, 255, .28);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(11, 95, 184, .18), rgba(13, 20, 32, .94));
+}
+
+.passport-intake.is-complete {
+  border-color: rgba(55, 194, 118, .42);
+}
+
+.passport-intake h3 {
+  margin: 12px 0 6px;
+  font-size: 19px;
+}
+
+.passport-intake p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.passport-intake__control input[type="file"] {
+  width: 100%;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.passport-result {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+}
+
+.passport-result__banner {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 213, 138, .08);
+  color: #ffe2af;
+}
+
+.passport-result__banner.is-valid {
+  border-color: rgba(55, 194, 118, .42);
+  background: rgba(55, 194, 118, .08);
+  color: #b6f7cf;
+}
+
+.passport-result__banner.is-invalid {
+  border-color: rgba(244, 183, 64, .42);
+}
+
+.passport-result__banner span {
+  color: inherit;
+  opacity: .84;
+  font-size: 12px;
+}
+
+.passport-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.passport-fields div,
+.passport-admin {
+  min-width: 0;
+}
+
+.passport-fields div {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(8, 13, 22, .62);
+}
+
+.passport-fields span,
+.passport-admin span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.passport-fields strong,
+.passport-admin strong {
+  display: block;
+  color: var(--text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.passport-admin {
+  display: grid;
+  gap: 5px;
+  max-width: 210px;
+}
+
+.passport-admin .pill {
+  width: max-content;
+}
+
+.payment-admin {
+  display: grid;
+  gap: 6px;
+  max-width: 190px;
+}
+
+.payment-admin .pill {
+  width: max-content;
+}
+
+.payment-admin small {
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+@media(max-width:1024px) {
+  .progress-panel {
+    position: static;
+  }
+}
+
+@media(max-width:760px) {
+  .visa-apply-layout.split-layout--full .requirements-card {
+    display: block;
+  }
+
+  .payment-card {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .payment-card__due {
+    padding: 18px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line-strong);
+  }
+
+  .upload-section,
+  .progress-panel {
+    padding: 20px;
+  }
+
+  .upload-section__header {
+    display: grid;
+  }
+
+  .luxury-plane {
+    margin-top: 26px;
+    width: min(100%, 476px);
+  }
+
+  .luxury-plane img {
+    height: auto;
+  }
+
+  .progress-panel {
+    position: static;
+  }
+
+  .passport-intake,
+  .passport-fields {
+    grid-template-columns: 1fr;
+  }
+}
