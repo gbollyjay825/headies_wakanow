@@ -247,14 +247,33 @@ section{scroll-margin-top:96px}
 .admin-title{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
 .admin-title h1{margin:0;font-size:30px;line-height:1.15}
 .admin-title p{margin:6px 0 0;color:var(--muted)}
+.admin-title__actions{display:flex;gap:10px;flex-wrap:wrap}
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px}
+.stat-grid--admin{grid-template-columns:repeat(4,minmax(0,1fr))}
 .stat-grid--wide{grid-template-columns:repeat(5,1fr)}
 .stat-card{padding:18px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
 .stat-card span{display:block;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .stat-card strong{display:block;margin-top:4px;font-size:28px;line-height:1}
+.admin-section-stack{display:grid;gap:22px}
 .admin-grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:22px;align-items:start}
-.admin-card{padding:22px}
+.admin-grid,.admin-grid>*{min-width:0}
+.admin-grid--allowlist{grid-template-columns:minmax(310px,360px) minmax(0,1fr)}
+.admin-card{min-width:0;padding:22px}
 .admin-card h2,.admin-card h3{margin:0 0 12px;font-size:18px}
+.admin-card__head{margin-bottom:16px}
+.admin-card__head--row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.admin-card__head h2{margin-bottom:4px}
+.admin-card__head p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+.admin-card--compact form{display:grid;gap:12px}
+.admin-form-grid{display:grid;gap:12px}
+.admin-import-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,420px) minmax(180px,220px);gap:22px;align-items:end;margin-bottom:22px;padding:26px}
+.admin-import-card__copy{min-width:0}
+.admin-import-card__copy .badge{width:max-content;margin-bottom:14px}
+.admin-import-card__copy h2{margin:0 0 8px;font-size:26px;line-height:1.12}
+.admin-import-card__copy p{max-width:680px;margin:0;color:var(--muted);font-size:14px;line-height:1.65}
+.admin-import-card__form{display:grid;gap:12px;min-width:0}
+.admin-import-card__actions{display:grid;gap:10px}
+.admin-import-card__actions .btn{width:100%}
 .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius)}
 .data-table{width:100%;min-width:760px;border-collapse:collapse}
 .data-table th,.data-table td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}
@@ -288,7 +307,19 @@ section{scroll-margin-top:96px}
   .package-grid,.process-grid{grid-template-columns:1fr}
   .package-card{grid-template-rows:240px 1fr}
   .package-card__media{height:240px;min-height:240px}
+  .stat-grid--admin{grid-template-columns:repeat(2,minmax(0,1fr))}
   .footer-grid{grid-template-columns:1fr 1fr}
+}
+
+@media(min-width:901px) and (max-width:1024px){
+  .admin-grid--allowlist{grid-template-columns:minmax(300px,340px) minmax(0,1fr)}
+}
+
+@media(max-width:900px){
+  .admin-grid--allowlist{grid-template-columns:1fr}
+  .admin-import-card{grid-template-columns:1fr;align-items:start}
+  .admin-import-card__actions{grid-template-columns:1fr 1fr}
+  .admin-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:760px){
   section{scroll-margin-top:78px}
@@ -347,6 +378,10 @@ section{scroll-margin-top:96px}
   .upload-row input[type=file]{max-width:none;width:100%;font-size:13px}
   .status-pills{width:100%}
   .status-pills .pill{flex:1 1 auto;justify-content:center}
+  .stat-grid--admin,.admin-form-grid,.admin-import-card__actions{grid-template-columns:1fr}
+  .admin-import-card{padding:18px}
+  .admin-import-card__copy h2{font-size:23px}
+  .admin-card__head--row{display:grid}
   .admin-title{align-items:flex-start}
   .admin-title h1{font-size:26px}
   .countdown{flex-wrap:wrap}

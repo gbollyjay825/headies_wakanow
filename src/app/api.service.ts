@@ -157,6 +157,13 @@ export class ApiService {
     });
   }
 
+  importEligible(records: Partial<EligibleApplicant>[]): Promise<{ count: number; applicants: EligibleApplicant[] }> {
+    return this.request('/api/eligible/import', {
+      method: 'POST',
+      body: JSON.stringify({ records })
+    });
+  }
+
   updateEligible(id: string, fields: Partial<EligibleApplicant>): Promise<{ applicant: EligibleApplicant }> {
     return this.request(`/api/eligible/${encodeURIComponent(id)}`, {
       method: 'PATCH',

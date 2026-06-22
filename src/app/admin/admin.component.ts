@@ -46,55 +46,68 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                 <h1>Road to Toronto | Visa Admin</h1>
                 <p>Preload approved applicant emails, manage login access and review submitted documents.</p>
               </div>
-              <div style="display:flex;gap:10px;flex-wrap:wrap">
-                <button class="btn btn-ghost btn-small" type="button" (click)="downloadTemplate()">Download CSV template</button>
-                <button class="btn btn-secondary btn-small" type="button" (click)="exportEligibleCSV()">Export access list</button>
+              <div class="admin-title__actions">
                 <button class="btn btn-danger btn-small" type="button" (click)="logout()">Sign out</button>
               </div>
             </div>
 
-            <div class="stat-grid">
+            <div class="stat-grid stat-grid--admin">
               <div class="stat-card"><span>Preloaded emails</span><strong>{{ applicants.length }}</strong></div>
-              <div class="stat-card"><span>Applications</span><strong>{{ applications.length }}</strong></div>
               <div class="stat-card"><span>Completed signups</span><strong>{{ completedSignupCount }}</strong></div>
+              <div class="stat-card"><span>Applications</span><strong>{{ applications.length }}</strong></div>
+              <div class="stat-card"><span>Uploaded documents</span><strong>{{ documentCount }}</strong></div>
             </div>
 
-            <div class="admin-grid">
-              <aside class="admin-card">
-                <h2>Preload approved email</h2>
-                <p style="margin:0 0 16px;color:var(--muted);font-size:13px">Only emails already listed here can sign up for visa access. Leave access code blank when the applicant should create it during signup.</p>
-                <form #addForm="ngForm" (ngSubmit)="addApplicant(addForm.valid)">
-                  <label class="field"><span class="form-label">Name</span><input name="name" type="text" [(ngModel)]="newApplicant.name" required></label>
-                  <label class="field" style="margin-top:12px"><span class="form-label">Email</span><input name="email" type="email" [(ngModel)]="newApplicant.email" required></label>
-                  <label class="field" style="margin-top:12px"><span class="form-label">Phone</span><input name="phone" type="tel" [(ngModel)]="newApplicant.phone"></label>
-                  <label class="field" style="margin-top:12px"><span class="form-label">Access code</span><input name="accessCode" type="password" autocomplete="new-password" [(ngModel)]="newApplicant.accessCode" placeholder="Optional admin-issued code"></label>
-                  <label class="field" style="margin-top:12px"><span class="form-label">Category</span>
-                    <select name="category" [(ngModel)]="newApplicant.category">
-                      <option value="">Unassigned</option>
-                      <option value="employed">Employed</option>
-                      <option value="business-owner">Business owner</option>
-                      <option value="employed-business-owner">Employed and business owner</option>
-                    </select>
-                  </label>
-                  <label class="field" style="margin-top:12px"><span class="form-label">Notes</span><textarea name="notes" [(ngModel)]="newApplicant.notes"></textarea></label>
-                  <button class="btn btn-blue btn-block" style="margin-top:16px" type="submit">Preload email</button>
-                  <p class="form-status" role="status">{{ addStatus }}</p>
-                </form>
-
-                <hr style="border:0;border-top:1px solid var(--line);margin:24px 0">
-
+            <section class="admin-card admin-import-card">
+              <div class="admin-import-card__copy">
+                <span class="badge">Primary setup</span>
                 <h2>Import allowlist</h2>
-                <p style="margin:0 0 14px;color:var(--muted);font-size:13px">Upload a CSV with approved emails. Columns: name, email, phone, accessCode, category, status, notes. Access code is optional.</p>
-                <form (ngSubmit)="importApplicants()">
-                  <label class="field"><span class="form-label">CSV file</span><input name="eligibleCsv" type="file" accept=".csv,text/csv" (change)="setImportFile($event)" required></label>
-                  <button class="btn btn-secondary btn-block" style="margin-top:14px" type="submit">Import approved emails</button>
-                  <p class="form-status" role="status">{{ importStatus }}</p>
-                </form>
-              </aside>
+                <p>Upload a CSV of approved applicant emails first. Signup is denied until an email exists in this list. Access code is optional; applicants can create one during signup when admin leaves it blank.</p>
+              </div>
+              <form class="admin-import-card__form" (ngSubmit)="importApplicants(importCsvInput)">
+                <label class="field">
+                  <span class="form-label">CSV file</span>
+                  <input #importCsvInput name="eligibleCsv" type="file" accept=".csv,text/csv" (change)="setImportFile($event)" required>
+                </label>
+                <button class="btn btn-blue btn-block" type="submit" [disabled]="importWorking">{{ importWorking ? 'Importing...' : 'Import approved emails' }}</button>
+                <p class="form-status" role="status">{{ importStatus || selectedImportFileName }}</p>
+              </form>
+              <div class="admin-import-card__actions">
+                <button class="btn btn-ghost btn-small" type="button" (click)="downloadTemplate()">Download CSV template</button>
+                <button class="btn btn-secondary btn-small" type="button" (click)="exportEligibleCSV()">Export access list</button>
+              </div>
+            </section>
 
-              <div style="display:grid;gap:22px">
+            <div class="admin-section-stack">
+              <div class="admin-grid admin-grid--allowlist">
+                <aside class="admin-card admin-card--compact">
+                  <div class="admin-card__head">
+                    <h2>Preload one email</h2>
+                    <p>Add an approved applicant manually when you do not need a CSV import.</p>
+                  </div>
+                  <form #addForm="ngForm" (ngSubmit)="addApplicant(addForm.valid)">
+                    <div class="admin-form-grid">
+                      <label class="field"><span class="form-label">Name</span><input name="name" type="text" [(ngModel)]="newApplicant.name" required></label>
+                      <label class="field"><span class="form-label">Email</span><input name="email" type="email" [(ngModel)]="newApplicant.email" required></label>
+                      <label class="field"><span class="form-label">Phone</span><input name="phone" type="tel" [(ngModel)]="newApplicant.phone"></label>
+                      <label class="field"><span class="form-label">Access code</span><input name="accessCode" type="password" autocomplete="new-password" [(ngModel)]="newApplicant.accessCode" placeholder="Optional admin-issued code"></label>
+                      <label class="field"><span class="form-label">Category</span>
+                        <select name="category" [(ngModel)]="newApplicant.category">
+                          <option value="">Unassigned</option>
+                          <option value="employed">Employed</option>
+                          <option value="business-owner">Business owner</option>
+                          <option value="employed-business-owner">Employed and business owner</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label class="field"><span class="form-label">Notes</span><textarea name="notes" [(ngModel)]="newApplicant.notes"></textarea></label>
+                    <button class="btn btn-blue btn-block" type="submit">Preload email</button>
+                    <p class="form-status" role="status">{{ addStatus }}</p>
+                  </form>
+                </aside>
+
                 <section class="admin-card">
-                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px">
+                  <div class="admin-card__head admin-card__head--row">
                     <div>
                       <h2>Visa email allowlist</h2>
                       <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Signup is denied unless the applicant email is already preloaded here. Active applicants can sign in after setting or receiving an access code.</p>
@@ -134,9 +147,10 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                     </table>
                   </div>
                 </section>
+              </div>
 
-                <section class="admin-card">
-                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px">
+              <section class="admin-card">
+                <div class="admin-card__head admin-card__head--row">
                     <div>
                       <h2>Visa applications and documents</h2>
                       <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Review submitted applications and download uploaded documents.</p>
@@ -196,7 +210,6 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                     </table>
                   </div>
                 </section>
-              </div>
             </div>
           </section>
         </div>
@@ -210,10 +223,12 @@ export class AdminComponent implements OnInit {
   addStatus = '';
   importStatus = '';
   accessStatus = '';
+  importWorking = false;
   isAdmin = sessionStorage.getItem('headiesVisaAdminSession') === 'true';
   applicants: EligibleApplicant[] = [];
   applications: VisaApplication[] = [];
   importFile: File | null = null;
+  selectedImportFileName = '';
 
   newApplicant: Partial<EligibleApplicant> = {
     name: '',
@@ -306,16 +321,29 @@ export class AdminComponent implements OnInit {
 
   setImportFile(event: Event): void {
     this.importFile = ((event.target as HTMLInputElement).files || [])[0] || null;
+    this.selectedImportFileName = this.importFile ? `Ready to import: ${this.importFile.name}` : '';
+    this.importStatus = '';
   }
 
-  async importApplicants(): Promise<void> {
+  async importApplicants(fileInput?: HTMLInputElement): Promise<void> {
     if (!this.importFile) {
       this.importStatus = 'Choose a CSV file.';
       return;
     }
-    const rows = this.parseCSV(await this.importFile.text());
-    for (const row of rows) {
-      await this.api.addEligible({
+    this.importWorking = true;
+    this.importStatus = 'Reading CSV...';
+    try {
+      const rows = this.parseCSV(await this.importFile.text());
+      if (!rows.length) {
+        this.importStatus = 'No rows found in the CSV.';
+        return;
+      }
+      const missingEmailIndex = rows.findIndex((row) => !(row['email'] || row['Email'] || '').trim());
+      if (missingEmailIndex >= 0) {
+        this.importStatus = `Row ${missingEmailIndex + 2} is missing an email address.`;
+        return;
+      }
+      const records = rows.map((row) => ({
         name: row['name'] || row['Name'] || '',
         email: row['email'] || row['Email'] || '',
         phone: row['phone'] || row['Phone'] || '',
@@ -323,23 +351,60 @@ export class AdminComponent implements OnInit {
         category: row['category'] || row['Category'] || '',
         status: (row['status'] || row['Status'] || 'active') as EligibleApplicant['status'],
         notes: row['notes'] || row['Notes'] || ''
-      });
+      }));
+      this.importStatus = 'Importing approved emails...';
+      await this.api.importEligible(records);
+      this.importStatus = `${records.length} approved email${records.length === 1 ? '' : 's'} imported.`;
+      this.importFile = null;
+      this.selectedImportFileName = '';
+      if (fileInput) fileInput.value = '';
+      await this.loadDashboard();
+    } catch (error) {
+      this.importStatus = error instanceof Error ? error.message : 'Could not import allowlist.';
+    } finally {
+      this.importWorking = false;
     }
-    this.importStatus = `${rows.length} approved email${rows.length === 1 ? '' : 's'} imported.`;
-    await this.loadDashboard();
   }
 
   parseCSV(text: string): Record<string, string>[] {
-    const [headerLine, ...lines] = text.split(/\r?\n/).filter((line) => line.trim());
-    if (!headerLine) return [];
-    const headers = headerLine.split(',').map((item) => item.trim());
-    return lines.map((line) => {
-      const cells = line.split(',');
-      return headers.reduce<Record<string, string>>((row, header, index) => {
-        row[header] = (cells[index] || '').trim();
-        return row;
-      }, {});
-    });
+    const rows = this.parseCsvRows(text).filter((row) => row.some((cell) => cell.trim()));
+    const [headers, ...records] = rows;
+    if (!headers || !headers.length) return [];
+    return records.map((cells) => headers.reduce<Record<string, string>>((row, header, index) => {
+      row[header.trim()] = (cells[index] || '').trim();
+      return row;
+    }, {}));
+  }
+
+  parseCsvRows(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let cell = '';
+    let quoted = false;
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      const next = text[index + 1];
+      if (char === '"' && quoted && next === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === ',' && !quoted) {
+        row.push(cell);
+        cell = '';
+      } else if ((char === '\n' || char === '\r') && !quoted) {
+        if (char === '\r' && next === '\n') index += 1;
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = '';
+      } else {
+        cell += char;
+      }
+    }
+    row.push(cell);
+    rows.push(row);
+    return rows;
   }
 
   downloadTemplate(): void {
