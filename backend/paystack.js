@@ -1,5 +1,5 @@
 const PAYSTACK_BASE_URL = (process.env.PAYSTACK_BASE_URL || 'https://api.paystack.co').replace(/\/+$/, '');
-const VISA_FEE_NAIRA = Number(process.env.VISA_FEE_NAIRA || 350000);
+const VISA_FEE_NAIRA = Number(process.env.VISA_FEE_NAIRA || 745000);
 const VISA_FEE_KOBO = VISA_FEE_NAIRA * 100;
 
 function parseApplicants(value) {

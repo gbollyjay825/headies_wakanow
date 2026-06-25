@@ -88,7 +88,7 @@ create table if not exists visa_applications (
   salary text not null default '',
   employment_length text not null default '',
   notes text not null default '',
-  fee text not null default 'NGN350,000 per applicant',
+  fee text not null default 'NGN745,000 per applicant',
   status text not null default 'Draft',
   payment_status text not null default 'Unpaid',
   payment_reference text not null default '',

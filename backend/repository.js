@@ -418,7 +418,7 @@ async function upsertApplicationPg(app) {
         String(app.salary || ''),
         String(app.employmentLength || ''),
         String(app.notes || ''),
-        String(app.fee || 'NGN350,000 per applicant'),
+        String(app.fee || 'NGN745,000 per applicant'),
         String(app.status || 'Draft'),
         String(app.paymentStatus || 'Unpaid'),
         String(app.paymentReference || ''),

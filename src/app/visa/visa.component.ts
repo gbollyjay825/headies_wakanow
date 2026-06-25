@@ -83,7 +83,7 @@ interface UploadDoc {
                 <div class="requirements-card__intro">
                   <p class="section-kicker">Canada Business Visa</p>
                   <h2 class="section-title" style="font-size:26px">Requirements and application guide</h2>
-                  <p style="margin:8px 0 22px;color:var(--muted)">Visa fee <strong style="color:var(--text)">NGN 350,000</strong> per applicant. Prepare these documents before uploading.</p>
+                  <p style="margin:8px 0 22px;color:var(--muted)">Visa fee <strong style="color:var(--text)">NGN 745,000</strong> per applicant. Prepare these documents before uploading.</p>
                   <div class="pss-note" style="margin-top:20px"><strong>Portal</strong><span>Applicants must be approved by an admin before upload access is enabled.</span></div>
                 </div>
                 <div class="requirement-grid">
@@ -178,7 +178,7 @@ interface UploadDoc {
                   <div class="payment-card__due">
                     <span>Total due</span>
                     <strong>{{ totalDueLabel }}</strong>
-                    <small>{{ application.applicants || 1 }} applicant(s) · NGN 350,000 each</small>
+                    <small>{{ application.applicants || 1 }} applicant(s) · NGN 745,000 each</small>
                     <button class="btn btn-blue btn-block" type="button" [disabled]="paymentWorking || paymentPaid" (click)="startPaystackPayment()">
                       {{ paymentPaid ? 'Payment verified' : paymentWorking ? 'Opening Paystack...' : 'Pay with card' }}
                     </button>
@@ -404,7 +404,7 @@ export class VisaComponent implements OnInit {
   }
 
   get totalDue(): number {
-    return this.applicantCount * 350000;
+    return this.applicantCount * 745000;
   }
 
   get totalDueLabel(): string {
@@ -457,7 +457,7 @@ export class VisaComponent implements OnInit {
       salary: '',
       employmentLength: '',
       notes: '',
-      fee: 'NGN350,000 per applicant',
+      fee: 'NGN745,000 per applicant',
       status: 'Draft',
       paymentStatus: 'Unpaid',
       paymentReference: '',

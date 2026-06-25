@@ -169,7 +169,7 @@ async function handleApi(method, pathname, body = {}) {
               salary: body.salary || '',
               employmentLength: body.employmentLength || '',
               notes: body.notes || '',
-              fee: 'NGN350,000 per applicant',
+              fee: 'NGN745,000 per applicant',
               status: 'Draft',
               uploads: [],
               passportDetails: body.passportDetails || null,

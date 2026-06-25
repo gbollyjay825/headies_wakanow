@@ -531,7 +531,7 @@
             salary:applicationForm.elements.salary?applicationForm.elements.salary.value.trim():'',
             employmentLength:applicationForm.elements.employmentLength?applicationForm.elements.employmentLength.value.trim():'',
             notes:applicationForm.elements.notes.value.trim(),
-            fee:'NGN350,000 per applicant',
+            fee:'NGN745,000 per applicant',
             status:'Submitted',
             uploads:uploads,
             createdAt:now(),
