@@ -29,6 +29,64 @@
   padding: 8px 10px;
 }
 
+.admin-tabs {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 22px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(13, 20, 32, .72);
+}
+
+.admin-tabs button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.admin-tabs button span {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(121, 173, 255, .12);
+  color: #cae0ff;
+  font-size: 11px;
+}
+
+.admin-tabs button.is-active {
+  border-color: rgba(121, 173, 255, .4);
+  background: rgba(121, 173, 255, .14);
+  color: var(--text);
+}
+
+.admin-grid--wide-panel {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.admin-card[hidden],
+.admin-import-card[hidden],
+.admin-grid[hidden] {
+  display: none !important;
+}
+
+.data-table td,
+.data-table th {
+  overflow-wrap: anywhere;
+}
+
+.pill--muted {
+  color: var(--muted);
+  border-color: var(--line);
+  background: rgba(255, 255, 255, .03);
+}
+
 .visa-apply-layout.split-layout--full {
   grid-template-columns: minmax(0, 1fr);
   max-width: 1480px;
@@ -144,14 +202,19 @@
 
 .payment-card__due {
   display: grid;
-  gap: 10px;
+  gap: 14px;
   align-content: start;
   min-width: 0;
   padding: 20px 0 20px 24px;
   border-left: 1px solid var(--line-strong);
 }
 
-.payment-card__due > span {
+.payment-card__total {
+  display: grid;
+  gap: 6px;
+}
+
+.payment-card__total > span {
   color: #ffd58a;
   font-size: 12px;
   font-weight: 900;
@@ -159,16 +222,32 @@
   text-transform: uppercase;
 }
 
-.payment-card__due strong {
+.payment-card__total strong {
   display: block;
   color: var(--text);
   font-size: clamp(30px, 4vw, 44px);
   line-height: 1.05;
 }
 
-.payment-card__due small {
+.payment-card__total small {
   color: var(--muted);
   font-size: 12px;
+}
+
+.payment-card__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.payment-card__hint {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(244, 183, 64, .28);
+  border-radius: var(--radius);
+  background: rgba(244, 183, 64, .08);
+  color: #f6d8a4;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .payment-card__link {
@@ -528,7 +607,7 @@
     font-size: 22px;
   }
 
-  .payment-card__due strong {
+  .payment-card__total strong {
     font-size: clamp(31px, 10vw, 42px);
     overflow-wrap: anywhere;
   }
@@ -580,6 +659,92 @@
 
   .review-check {
     padding: 13px;
+  }
+
+  .admin-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 6px;
+  }
+
+  .admin-tabs button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .admin-main {
+    padding-top: 18px;
+  }
+
+  .admin-card .table-wrap {
+    overflow: visible;
+    border: 0;
+  }
+
+  .admin-card .data-table,
+  .admin-card .data-table thead,
+  .admin-card .data-table tbody,
+  .admin-card .data-table tr,
+  .admin-card .data-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-card .data-table thead {
+    display: none;
+  }
+
+  .admin-card .data-table tr {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #0d1420;
+  }
+
+  .admin-card .data-table tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .admin-card .data-table td {
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    padding: 0;
+    border-bottom: 0;
+    font-size: 13px;
+  }
+
+  .admin-card .data-table td::before {
+    content: attr(data-label);
+    color: #a8b7cc;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .admin-card .data-table select,
+  .admin-card .data-table .btn,
+  .access-code-cell {
+    width: 100%;
+  }
+
+  .payment-admin,
+  .passport-admin {
+    max-width: none;
+  }
+
+  .document-list li {
+    display: grid;
   }
 }
 

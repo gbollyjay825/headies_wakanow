@@ -58,7 +58,19 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
               <div class="stat-card"><span>Uploaded documents</span><strong>{{ documentCount }}</strong></div>
             </div>
 
-            <section class="admin-card admin-import-card">
+            <nav class="admin-tabs" aria-label="Admin sections">
+              <button type="button" [class.is-active]="activeTab === 'applications'" (click)="activeTab = 'applications'">
+                Applications <span>{{ applications.length }}</span>
+              </button>
+              <button type="button" [class.is-active]="activeTab === 'setup'" (click)="activeTab = 'setup'">
+                Setup <span>Import</span>
+              </button>
+              <button type="button" [class.is-active]="activeTab === 'allowlist'" (click)="activeTab = 'allowlist'">
+                Allowlist <span>{{ applicants.length }}</span>
+              </button>
+            </nav>
+
+            <section class="admin-card admin-import-card" [hidden]="activeTab !== 'setup'">
               <div class="admin-import-card__copy">
                 <span class="badge">Primary setup</span>
                 <h2>Import allowlist</h2>
@@ -79,8 +91,70 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
             </section>
 
             <div class="admin-section-stack">
-              <div class="admin-grid admin-grid--allowlist">
-                <aside class="admin-card admin-card--compact">
+              <section class="admin-card" [hidden]="activeTab !== 'applications'">
+                <div class="admin-card__head admin-card__head--row">
+                    <div>
+                      <h2>Visa applications and documents</h2>
+                      <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Review submitted applications and download uploaded documents.</p>
+                    </div>
+                  </div>
+                  <div class="empty-state" *ngIf="!applications.length">No submitted visa applications yet.</div>
+                  <div class="table-wrap" *ngIf="applications.length">
+                    <table class="data-table data-table--applications">
+                      <thead><tr><th>Applicant</th><th>Status</th><th>Payment</th><th>Category</th><th>Passport</th><th>Updated</th><th>Documents</th></tr></thead>
+                      <tbody>
+                        <tr *ngFor="let app of applications">
+                          <td data-label="Applicant"><strong>{{ app.name || app.email }}</strong><div>{{ app.email }} · {{ app.phone }}</div></td>
+                          <td data-label="Status">
+                            <select [ngModel]="app.status" (ngModelChange)="updateApplicationStatus(app, $event)">
+                              <option value="Draft">Draft</option>
+                              <option value="Submitted">Submitted</option>
+                              <option value="In review">In review</option>
+                              <option value="Missing documents">Missing documents</option>
+                              <option value="Approved">Approved</option>
+                              <option value="Declined">Declined</option>
+                            </select>
+                          </td>
+                          <td data-label="Payment">
+                            <div class="payment-admin">
+                              <span class="pill" [class.pill--ok]="app.paymentStatus === 'Paid'" [class.pill--warn]="app.paymentStatus === 'Pending' || app.paymentStatus === 'Failed'">
+                                {{ app.paymentStatus || 'Unpaid' }}
+                              </span>
+                              <small *ngIf="app.paymentReference">{{ app.paymentReference }}</small>
+                            </div>
+                          </td>
+                          <td data-label="Category">{{ app.applicantCategory || 'Unassigned' }}</td>
+                          <td data-label="Passport">
+                            <div class="passport-admin" *ngIf="app.passportDetails?.parsed; else noPassportDetails">
+                              <strong>{{ app.passportDetails?.parsed?.passportNumber || 'Passport captured' }}</strong>
+                              <span>{{ adminPassportName(app) }}</span>
+                              <span>Expiry {{ app.passportExpiry || app.passportDetails?.parsed?.expirationDate || 'not found' }}</span>
+                              <span class="pill" [class.pill--ok]="app.passportDetails?.validation?.valid" [class.pill--warn]="app.passportDetails?.validation && !app.passportDetails?.validation?.valid">
+                                {{ app.passportDetails?.validation?.valid ? 'Valid' : 'Review' }}
+                              </span>
+                            </div>
+                            <ng-template #noPassportDetails><span class="pill pill--muted">Not parsed</span></ng-template>
+                          </td>
+                          <td data-label="Updated">{{ formatDate(app.updatedAt || app.createdAt) }}</td>
+                          <td data-label="Documents">
+                            <ul class="document-list" *ngIf="countFiles(app); else noFiles">
+                              <ng-container *ngFor="let upload of app.uploads">
+                                <li *ngFor="let file of upload.files">
+                                  <span>{{ upload.document }} · {{ file.name }} · {{ fileSize(file.size) }}</span>
+                                  <a class="doc-link" [href]="file.dataUrl" [download]="file.name">Download</a>
+                                </li>
+                              </ng-container>
+                            </ul>
+                            <ng-template #noFiles><span class="pill pill--muted">No files</span></ng-template>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+              <div class="admin-grid admin-grid--allowlist" [class.admin-grid--wide-panel]="activeTab === 'allowlist'" [hidden]="activeTab === 'applications'">
+                <aside class="admin-card admin-card--compact" [hidden]="activeTab !== 'setup'">
                   <div class="admin-card__head">
                     <h2>Preload one email</h2>
                     <p>Add an approved applicant manually when you do not need a CSV import.</p>
@@ -106,7 +180,7 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                   </form>
                 </aside>
 
-                <section class="admin-card">
+                <section class="admin-card" [hidden]="activeTab !== 'allowlist'">
                   <div class="admin-card__head admin-card__head--row">
                     <div>
                       <h2>Visa email allowlist</h2>
@@ -116,100 +190,38 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                   </div>
                   <div class="empty-state" *ngIf="!applicants.length">No approved emails have been preloaded yet.</div>
                   <div class="table-wrap" *ngIf="applicants.length">
-                    <table class="data-table">
+                    <table class="data-table data-table--allowlist">
                       <thead><tr><th>Applicant</th><th>Email</th><th>Access code</th><th>Category</th><th>Status</th><th>Signup</th><th>Actions</th></tr></thead>
                       <tbody>
                         <tr *ngFor="let applicant of applicants">
-                          <td><strong>{{ applicant.name || 'Unnamed' }}</strong><div>{{ applicant.phone }}</div></td>
-                          <td>{{ applicant.email }}</td>
-                          <td>
+                          <td data-label="Applicant"><strong>{{ applicant.name || 'Unnamed' }}</strong><div>{{ applicant.phone }}</div></td>
+                          <td data-label="Email">{{ applicant.email }}</td>
+                          <td data-label="Access code">
                             <div class="access-code-cell">
                               <input class="input" [name]="'accessCode-' + applicant.id" type="password" autocomplete="new-password" [(ngModel)]="applicant.accessCode" minlength="6">
                               <button class="btn btn-secondary btn-small" type="button" (click)="updateApplicantCode(applicant)">Save code</button>
                             </div>
                           </td>
-                          <td>{{ applicant.category || 'Unassigned' }}</td>
-                          <td>
+                          <td data-label="Category">{{ applicant.category || 'Unassigned' }}</td>
+                          <td data-label="Status">
                             <select [ngModel]="applicant.status" (ngModelChange)="updateApplicantStatus(applicant, $event)">
                               <option value="pending">pending</option>
                               <option value="active">active</option>
                               <option value="blocked">blocked</option>
                             </select>
                           </td>
-                          <td>
+                          <td data-label="Signup">
                             <span class="pill" [class.pill--ok]="applicant.signupCompletedAt" [class.pill--warn]="!applicant.signupCompletedAt">
                               {{ applicant.signupCompletedAt ? 'Code set' : 'Awaiting signup' }}
                             </span>
                           </td>
-                          <td><button class="btn btn-ghost btn-small" type="button" (click)="removeApplicant(applicant)">Remove</button></td>
+                          <td data-label="Actions"><button class="btn btn-ghost btn-small" type="button" (click)="removeApplicant(applicant)">Remove</button></td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
                 </section>
               </div>
-
-              <section class="admin-card">
-                <div class="admin-card__head admin-card__head--row">
-                    <div>
-                      <h2>Visa applications and documents</h2>
-                      <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Review submitted applications and download uploaded documents.</p>
-                    </div>
-                  </div>
-                  <div class="empty-state" *ngIf="!applications.length">No submitted visa applications yet.</div>
-                  <div class="table-wrap" *ngIf="applications.length">
-                    <table class="data-table">
-                      <thead><tr><th>Applicant</th><th>Status</th><th>Payment</th><th>Category</th><th>Passport</th><th>Updated</th><th>Documents</th></tr></thead>
-                      <tbody>
-                        <tr *ngFor="let app of applications">
-                          <td><strong>{{ app.name || app.email }}</strong><div>{{ app.email }} · {{ app.phone }}</div></td>
-                          <td>
-                            <select [ngModel]="app.status" (ngModelChange)="updateApplicationStatus(app, $event)">
-                              <option value="Draft">Draft</option>
-                              <option value="Submitted">Submitted</option>
-                              <option value="In review">In review</option>
-                              <option value="Missing documents">Missing documents</option>
-                              <option value="Approved">Approved</option>
-                              <option value="Declined">Declined</option>
-                            </select>
-                          </td>
-                          <td>
-                            <div class="payment-admin">
-                              <span class="pill" [class.pill--ok]="app.paymentStatus === 'Paid'" [class.pill--warn]="app.paymentStatus === 'Pending' || app.paymentStatus === 'Failed'">
-                                {{ app.paymentStatus || 'Unpaid' }}
-                              </span>
-                              <small *ngIf="app.paymentReference">{{ app.paymentReference }}</small>
-                            </div>
-                          </td>
-                          <td>{{ app.applicantCategory }}</td>
-                          <td>
-                            <div class="passport-admin" *ngIf="app.passportDetails?.parsed; else noPassportDetails">
-                              <strong>{{ app.passportDetails?.parsed?.passportNumber || 'Passport captured' }}</strong>
-                              <span>{{ adminPassportName(app) }}</span>
-                              <span>Expiry {{ app.passportExpiry || app.passportDetails?.parsed?.expirationDate || 'not found' }}</span>
-                              <span class="pill" [class.pill--ok]="app.passportDetails?.validation?.valid" [class.pill--warn]="app.passportDetails?.validation && !app.passportDetails?.validation?.valid">
-                                {{ app.passportDetails?.validation?.valid ? 'Valid' : 'Review' }}
-                              </span>
-                            </div>
-                            <ng-template #noPassportDetails><span class="pill pill--muted">Not parsed</span></ng-template>
-                          </td>
-                          <td>{{ formatDate(app.updatedAt || app.createdAt) }}</td>
-                          <td>
-                            <ul class="document-list" *ngIf="countFiles(app); else noFiles">
-                              <ng-container *ngFor="let upload of app.uploads">
-                                <li *ngFor="let file of upload.files">
-                                  <span>{{ upload.document }} · {{ file.name }} · {{ fileSize(file.size) }}</span>
-                                  <a class="doc-link" [href]="file.dataUrl" [download]="file.name">Download</a>
-                                </li>
-                              </ng-container>
-                            </ul>
-                            <ng-template #noFiles><span class="pill pill--muted">No files</span></ng-template>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
             </div>
           </section>
         </div>
@@ -229,6 +241,7 @@ export class AdminComponent implements OnInit {
   applications: VisaApplication[] = [];
   importFile: File | null = null;
   selectedImportFileName = '';
+  activeTab: 'applications' | 'setup' | 'allowlist' = 'applications';
 
   newApplicant: Partial<EligibleApplicant> = {
     name: '',

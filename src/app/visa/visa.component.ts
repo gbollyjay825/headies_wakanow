@@ -166,9 +166,9 @@ interface UploadDoc {
               <form id="visaApplicationForm" class="application-flow" #applicationForm="ngForm" (ngSubmit)="submitApplication(applicationForm.valid)">
                 <section class="portal-card payment-card" [class.is-paid]="paymentPaid">
                   <div class="payment-card__copy">
-                    <p class="section-kicker">Payment</p>
-                    <h2>Visa service payment</h2>
-                    <p>{{ paymentPaid ? 'Payment has been verified. Continue with the applicant documents and final review.' : 'Pay now to unlock a clean submission path, or upload documents first and pay before final submission.' }}</p>
+                    <p class="section-kicker">Payment step</p>
+                    <h2>{{ paymentPaid ? 'Payment verified' : 'Choose how to continue' }}</h2>
+                    <p>{{ paymentPaid ? 'Payment has been verified. Continue with the applicant documents and final review.' : 'Pay securely by card now, or continue to the document checklist and pay before final submission.' }}</p>
                     <div class="payment-card__meta">
                       <span class="pill" [class.pill--ok]="paymentPaid" [class.pill--warn]="paymentPending || paymentFailed">{{ paymentStatusLabel }}</span>
                       <small *ngIf="application.paymentReference">Reference {{ application.paymentReference }}</small>
@@ -176,13 +176,20 @@ interface UploadDoc {
                     </div>
                   </div>
                   <div class="payment-card__due">
-                    <span>Total due</span>
-                    <strong>{{ totalDueLabel }}</strong>
-                    <small>{{ application.applicants || 1 }} applicant(s) · NGN 745,000 each</small>
-                    <button class="btn btn-blue btn-block" type="button" [disabled]="paymentWorking || paymentPaid" (click)="startPaystackPayment()">
-                      {{ paymentPaid ? 'Payment verified' : paymentWorking ? 'Opening Paystack...' : 'Pay with card' }}
-                    </button>
-                    <button class="payment-card__link" type="button" *ngIf="!paymentPaid && !uploadSectionVisible" (click)="openUploadsBeforePayment()">Upload documents first</button>
+                    <div class="payment-card__total">
+                      <span>Total due</span>
+                      <strong>{{ totalDueLabel }}</strong>
+                      <small>{{ application.applicants || 1 }} applicant(s) · NGN 745,000 each</small>
+                    </div>
+                    <div class="payment-card__actions">
+                      <button class="btn btn-blue btn-block" type="button" [disabled]="paymentWorking || paymentPaid" (click)="startPaystackPayment()">
+                        {{ paymentPaid ? 'Payment verified' : paymentWorking ? 'Opening Paystack...' : 'Pay now with card' }}
+                      </button>
+                      <button class="btn btn-secondary btn-block" type="button" *ngIf="!paymentPaid && !uploadSectionVisible" (click)="openUploadsBeforePayment()">Continue to uploads</button>
+                    </div>
+                    <p class="payment-card__hint" *ngIf="!paymentPaid">
+                      {{ uploadSectionVisible ? 'Uploads are open. Payment is still required before you can submit.' : 'You can upload first, but submission stays locked until Paystack verifies payment.' }}
+                    </p>
                     <p class="form-status" role="status">{{ paymentStatus }}</p>
                   </div>
                 </section>
@@ -293,7 +300,7 @@ interface UploadDoc {
                   <div [class.is-complete]="reviewConfirmed"><b></b><span>Applicant review</span></div>
                 </div>
                 <button class="btn btn-blue btn-block" type="button" *ngIf="!paymentPaid" [disabled]="paymentWorking" (click)="startPaystackPayment()">
-                  {{ paymentWorking ? 'Opening Paystack...' : 'Make payment · ' + totalDueLabel }}
+                  {{ paymentWorking ? 'Opening Paystack...' : 'Pay to submit · ' + totalDueLabel }}
                 </button>
                 <button class="btn btn-blue btn-block" type="submit" form="visaApplicationForm" *ngIf="paymentPaid" [disabled]="!reviewConfirmed">
                   Submit and review
@@ -436,7 +443,9 @@ export class VisaComponent implements OnInit {
 
   get progressStatusText(): string {
     if (!this.paymentPaid) {
-      return this.paymentStatus || 'Pay securely with Paystack before final submission.';
+      return this.paymentStatus || (this.uploadSectionVisible
+        ? 'Documents can be uploaded now. Pay with card before final submission.'
+        : 'Choose pay now or continue to uploads. Submission stays locked until payment is verified.');
     }
     return this.applicationStatus || 'Confirm the review checklist when all required uploads are ready.';
   }
@@ -585,7 +594,7 @@ export class VisaComponent implements OnInit {
 
   openUploadsBeforePayment(): void {
     this.uploadUnlocked = true;
-    this.paymentStatus = 'Documents can be uploaded now. Payment is still required before final submission.';
+    this.paymentStatus = 'Uploads are open. Payment is still required before final submission.';
   }
 
   async startPaystackPayment(): Promise<void> {
