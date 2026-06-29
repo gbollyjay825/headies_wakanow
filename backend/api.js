@@ -169,7 +169,7 @@ async function handleApi(method, pathname, body = {}) {
               salary: body.salary || '',
               employmentLength: body.employmentLength || '',
               notes: body.notes || '',
-              fee: 'NGN745,000 per applicant',
+              fee: 'NGN745,000 per applicant package: visa fee NGN350,000, admin processing fee included, Headies ticket fee included',
               status: 'Draft',
               uploads: [],
               passportDetails: body.passportDetails || null,

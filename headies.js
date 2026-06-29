@@ -254,7 +254,7 @@
       }
       return {
         service:'Canada Business Visa',
-        fee:'NGN745,000 per applicant',
+        fee:'NGN745,000 per applicant package: visa fee NGN350,000, admin processing fee included, Headies ticket fee included',
         portalStatus:'Document upload page available at visa.html',
         applicants:value('visaApplicants'),
         applicantCategory:value('visaApplicantType'),
@@ -565,7 +565,7 @@
           employmentLength:form.elements.employmentLength ? form.elements.employmentLength.value.trim() : '',
           notes:form.elements.notes ? form.elements.notes.value.trim() : '',
           uploads:collectUploads(),
-          fee:'NGN745,000 per applicant',
+          fee:'NGN745,000 per applicant package: visa fee NGN350,000, admin processing fee included, Headies ticket fee included',
           destinationEmail:'visa@wakanow.com',
           source:location.pathname,
           createdAt:new Date().toISOString()

@@ -163,6 +163,11 @@ section{scroll-margin-top:96px}
 .summary-row small{display:block;color:var(--muted);font-size:12px;line-height:1.35;overflow-wrap:anywhere}
 .pss-note{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:flex-start;margin-top:16px;padding:12px;border:1px solid rgba(245,130,32,.24);border-radius:var(--radius);background:rgba(245,130,32,.08);font-size:13px;line-height:1.45;color:#e7d3be}
 .pss-note span{min-width:0;overflow-wrap:anywhere}
+.fee-breakdown{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.fee-breakdown li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:rgba(13,20,32,.78)}
+.fee-breakdown span{min-width:0;color:var(--muted);font-size:12px;line-height:1.35}
+.fee-breakdown strong{color:var(--text);font-size:12px;line-height:1.35;text-align:right;white-space:nowrap}
+.fee-breakdown--compact{margin:0 0 18px}
 
 .package-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;align-items:stretch}
 .package-card{overflow:hidden;display:grid;grid-template-rows:220px 1fr;min-height:100%}
@@ -357,6 +362,8 @@ section{scroll-margin-top:96px}
   .summary-card__head{align-items:center}
   .summary-row{padding:13px 0}
   .pss-note{grid-template-columns:1fr;gap:4px}
+  .fee-breakdown li{grid-template-columns:1fr;gap:4px}
+  .fee-breakdown strong{text-align:left}
   .package-card{grid-template-rows:200px 1fr}
   .package-card__media{height:200px;min-height:200px}
   .package-card__body{padding:18px}

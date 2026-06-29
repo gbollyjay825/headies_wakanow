@@ -250,6 +250,45 @@
   line-height: 1.45;
 }
 
+.fee-breakdown {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fee-breakdown li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(13, 20, 32, .78);
+}
+
+.fee-breakdown span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.fee-breakdown strong {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fee-breakdown--compact {
+  margin: 0 0 18px;
+}
+
 .payment-card__link {
   width: max-content;
   border: 0;
@@ -618,6 +657,15 @@
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
     color: #dbe9ff;
+  }
+
+  .fee-breakdown li {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .fee-breakdown strong {
+    text-align: left;
   }
 
   .upload-section {

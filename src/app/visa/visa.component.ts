@@ -83,7 +83,12 @@ interface UploadDoc {
                 <div class="requirements-card__intro">
                   <p class="section-kicker">Canada Business Visa</p>
                   <h2 class="section-title" style="font-size:26px">Requirements and application guide</h2>
-                  <p style="margin:8px 0 22px;color:var(--muted)">Visa fee <strong style="color:var(--text)">NGN 745,000</strong> per applicant. Prepare these documents before uploading.</p>
+                  <p style="margin:8px 0 18px;color:var(--muted)">Total payable package <strong style="color:var(--text)">NGN 745,000</strong> per applicant. Prepare these documents before uploading.</p>
+                  <ul class="fee-breakdown fee-breakdown--compact" aria-label="Visa package breakdown">
+                    <li><span>Visa fee</span><strong>NGN 350,000</strong></li>
+                    <li><span>Admin processing fee</span><strong>Included</strong></li>
+                    <li><span>Headies ticket fee</span><strong>Included</strong></li>
+                  </ul>
                   <div class="pss-note" style="margin-top:20px"><strong>Portal</strong><span>Applicants must be approved by an admin before upload access is enabled.</span></div>
                 </div>
                 <div class="requirement-grid">
@@ -179,8 +184,13 @@ interface UploadDoc {
                     <div class="payment-card__total">
                       <span>Total due</span>
                       <strong>{{ totalDueLabel }}</strong>
-                      <small>{{ application.applicants || 1 }} applicant(s) · NGN 745,000 each</small>
+                      <small>{{ application.applicants || 1 }} applicant(s) · package total per applicant</small>
                     </div>
+                    <ul class="fee-breakdown" aria-label="Payment breakdown">
+                      <li><span>Visa fee</span><strong>NGN 350,000</strong></li>
+                      <li><span>Admin processing fee</span><strong>Included</strong></li>
+                      <li><span>Headies ticket fee</span><strong>Included</strong></li>
+                    </ul>
                     <div class="payment-card__actions">
                       <button class="btn btn-blue btn-block" type="button" [disabled]="paymentWorking || paymentPaid" (click)="startPaystackPayment()">
                         {{ paymentPaid ? 'Payment verified' : paymentWorking ? 'Opening Paystack...' : 'Pay now with card' }}
@@ -466,7 +476,7 @@ export class VisaComponent implements OnInit {
       salary: '',
       employmentLength: '',
       notes: '',
-      fee: 'NGN745,000 per applicant',
+      fee: 'NGN745,000 per applicant package: visa fee NGN350,000, admin processing fee included, Headies ticket fee included',
       status: 'Draft',
       paymentStatus: 'Unpaid',
       paymentReference: '',
