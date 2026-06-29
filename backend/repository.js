@@ -418,7 +418,7 @@ async function upsertApplicationPg(app) {
         String(app.salary || ''),
         String(app.employmentLength || ''),
         String(app.notes || ''),
-        String(app.fee || 'NGN745,000 per applicant package: visa fee NGN350,000, admin processing fee included, Headies ticket fee included'),
+        String(app.fee || 'NGN745,000 per applicant package: visa fee included, admin processing fee included, Headies ticket fee included'),
         String(app.status || 'Draft'),
         String(app.paymentStatus || 'Unpaid'),
         String(app.paymentReference || ''),

@@ -85,7 +85,7 @@ interface UploadDoc {
                   <h2 class="section-title" style="font-size:26px">Requirements and application guide</h2>
                   <p style="margin:8px 0 18px;color:var(--muted)">Total payable package <strong style="color:var(--text)">NGN 745,000</strong> per applicant. Prepare these documents before uploading.</p>
                   <ul class="fee-breakdown fee-breakdown--compact" aria-label="Visa package breakdown">
-                    <li><span>Visa fee</span><strong>NGN 350,000</strong></li>
+                    <li><span>Visa fee</span><strong>Included</strong></li>
                     <li><span>Admin processing fee</span><strong>Included</strong></li>
                     <li><span>Headies ticket fee</span><strong>Included</strong></li>
                   </ul>
@@ -187,7 +187,7 @@ interface UploadDoc {
                       <small>{{ application.applicants || 1 }} applicant(s) · package total per applicant</small>
                     </div>
                     <ul class="fee-breakdown" aria-label="Payment breakdown">
-                      <li><span>Visa fee</span><strong>NGN 350,000</strong></li>
+                      <li><span>Visa fee</span><strong>Included</strong></li>
                       <li><span>Admin processing fee</span><strong>Included</strong></li>
                       <li><span>Headies ticket fee</span><strong>Included</strong></li>
                     </ul>
@@ -476,7 +476,7 @@ export class VisaComponent implements OnInit {
       salary: '',
       employmentLength: '',
       notes: '',
-      fee: 'NGN745,000 per applicant package: visa fee NGN350,000, admin processing fee included, Headies ticket fee included',
+      fee: 'NGN745,000 per applicant package: visa fee included, admin processing fee included, Headies ticket fee included',
       status: 'Draft',
       paymentStatus: 'Unpaid',
       paymentReference: '',

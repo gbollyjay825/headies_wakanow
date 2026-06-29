@@ -531,7 +531,7 @@
             salary:applicationForm.elements.salary?applicationForm.elements.salary.value.trim():'',
             employmentLength:applicationForm.elements.employmentLength?applicationForm.elements.employmentLength.value.trim():'',
             notes:applicationForm.elements.notes.value.trim(),
-            fee:'NGN745,000 per applicant package: visa fee NGN350,000, admin processing fee included, Headies ticket fee included',
+            fee:'NGN745,000 per applicant package: visa fee included, admin processing fee included, Headies ticket fee included',
             status:'Submitted',
             uploads:uploads,
             createdAt:now(),
