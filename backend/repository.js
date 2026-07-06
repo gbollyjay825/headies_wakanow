@@ -112,23 +112,27 @@ function parsePositiveInt(value, fallback) {
 }
 
 function parseDataUrl(file) {
-  const dataUrl = String(file.dataUrl || '');
-  const match = dataUrl.match(/^data:([^;,]+)?;base64,(.*)$/);
-  if (!match) {
-    return {
-      fileType: file.type || 'application/octet-stream',
-      fileData: Buffer.from('')
-    };
+  const dataUrl = String((file && file.dataUrl) || '');
+  const match = dataUrl.match(/^data:([^;,]*)(?:;[^,]*)?;base64,(.+)$/);
+  const fileData = match ? Buffer.from(match[2], 'base64') : Buffer.from('');
+  if (!match || !fileData.length) {
+    const error = new Error(`File "${(file && file.name) || 'upload'}" could not be read. Re-select the file and try again.`);
+    error.status = 400;
+    throw error;
   }
   return {
-    fileType: match[1] || file.type || 'application/octet-stream',
-    fileData: Buffer.from(match[2], 'base64')
+    fileType: match[1] || (file && file.type) || 'application/octet-stream',
+    fileData
   };
 }
 
-function dataUrlFromDocument(row) {
-  const fileData = Buffer.isBuffer(row.file_data) ? row.file_data : Buffer.from(row.file_data || '');
-  return `data:${row.file_type || 'application/octet-stream'};base64,${fileData.toString('base64')}`;
+function toDocumentFile(row) {
+  return {
+    id: row.id,
+    name: row.file_name,
+    size: Number(row.file_size || 0),
+    type: row.file_type
+  };
 }
 
 function attachDocuments(applications, documents) {
@@ -150,12 +154,7 @@ function attachDocuments(applications, documents) {
           files: []
         });
       }
-      grouped.get(key).files.push({
-        name: doc.file_name,
-        size: Number(doc.file_size || 0),
-        type: doc.file_type,
-        dataUrl: dataUrlFromDocument(doc)
-      });
+      grouped.get(key).files.push(toDocumentFile(doc));
     });
     return { ...app, uploads: Array.from(grouped.values()) };
   });
@@ -338,7 +337,8 @@ async function selectApplicationsPg(whereSql, params) {
   const applications = appsResult.rows.map(toApplication);
   if (!applications.length) return [];
   const docResult = await pool.query(
-    'select * from visa_application_documents where application_id = any($1::text[]) order by created_at asc',
+    `select id, application_id, field, document, required, file_name, file_size, file_type, created_at
+     from visa_application_documents where application_id = any($1::text[]) order by created_at asc`,
     [applications.map((app) => app.id)]
   );
   return attachDocuments(applications, docResult.rows);
@@ -431,11 +431,25 @@ async function upsertApplicationPg(app) {
       ]
     );
 
-    await client.query('delete from visa_application_documents where application_id = $1', [id]);
-    const uploads = Array.isArray(app.uploads) ? app.uploads : [];
-    for (const upload of uploads) {
-      const files = Array.isArray(upload.files) ? upload.files : [];
-      for (const file of files) {
+    // Documents are only replaced when the caller explicitly provides an uploads
+    // array. Omitting `uploads` (the lightweight finalize/submit path) leaves the
+    // stored documents untouched. Files echoed back as metadata (id, no dataUrl)
+    // are preserved instead of being wiped.
+    if (Array.isArray(app.uploads)) {
+      const keepIds = [];
+      const inserts = [];
+      for (const upload of app.uploads) {
+        const files = Array.isArray(upload && upload.files) ? upload.files : [];
+        for (const file of files) {
+          if (file && file.dataUrl) inserts.push({ upload, file });
+          else if (file && file.id) keepIds.push(String(file.id));
+        }
+      }
+      await client.query(
+        'delete from visa_application_documents where application_id = $1 and not (id = any($2::text[]))',
+        [id, keepIds]
+      );
+      for (const { upload, file } of inserts) {
         const parsed = parseDataUrl(file);
         await client.query(
           `insert into visa_application_documents
@@ -448,7 +462,7 @@ async function upsertApplicationPg(app) {
             String(upload.document || ''),
             Boolean(upload.required),
             String(file.name || 'upload'),
-            Number(file.size || parsed.fileData.length || 0),
+            parsed.fileData.length,
             parsed.fileType,
             parsed.fileData
           ]
@@ -475,8 +489,8 @@ async function updateApplicationPg(id, fields) {
          payment_reference = coalesce($6, payment_reference),
          payment_amount = coalesce($7, payment_amount),
          payment_currency = coalesce($8, payment_currency),
-         payment_paid_at = coalesce($9::timestamptz, payment_paid_at),
-         reviewed_at = coalesce($10::timestamptz, reviewed_at),
+         payment_paid_at = coalesce(nullif($9, '')::timestamptz, payment_paid_at),
+         reviewed_at = coalesce(nullif($10, '')::timestamptz, reviewed_at),
          updated_at = now()
      where id = $1
      returning *`,
@@ -498,6 +512,92 @@ async function updateApplicationPg(id, fields) {
 
 async function updateApplicationPaymentPg(id, fields) {
   return updateApplicationPg(id, fields);
+}
+
+async function ensureApplicationRowPg(client, applicationId) {
+  const found = await client.query(
+    'select id from visa_applications where id = $1 or applicant_id = $1 limit 1',
+    [applicationId]
+  );
+  if (found.rows[0]) return found.rows[0].id;
+  const eligibleResult = await client.query(
+    'select id, name, email, phone, category from visa_eligible_applicants where id = $1 limit 1',
+    [applicationId]
+  );
+  const applicant = eligibleResult.rows[0] || null;
+  await client.query(
+    `insert into visa_applications (id, applicant_id, name, email, phone, applicant_category, status, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, 'Draft', now(), now())
+     on conflict (id) do nothing`,
+    [
+      applicationId,
+      applicant ? applicant.id : null,
+      applicant ? applicant.name : '',
+      applicant ? applicant.email : '',
+      applicant ? applicant.phone : '',
+      applicant ? applicant.category : ''
+    ]
+  );
+  return applicationId;
+}
+
+async function setApplicationDocumentPg(applicationId, payload) {
+  const parsed = parseDataUrl(payload.file);
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const id = await ensureApplicationRowPg(client, String(applicationId));
+    if (payload.replaceField) {
+      await client.query(
+        'delete from visa_application_documents where application_id = $1 and field = $2',
+        [id, String(payload.field || '')]
+      );
+    }
+    await client.query(
+      `insert into visa_application_documents
+        (id, application_id, field, document, required, file_name, file_size, file_type, file_data)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        makeId('doc'),
+        id,
+        String(payload.field || ''),
+        String(payload.document || ''),
+        Boolean(payload.required),
+        String((payload.file && payload.file.name) || 'upload'),
+        parsed.fileData.length,
+        parsed.fileType,
+        parsed.fileData
+      ]
+    );
+    await client.query('update visa_applications set updated_at = now() where id = $1', [id]);
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+  return getApplicationPg(String(applicationId));
+}
+
+async function getApplicationDocumentPg(applicationId, documentId) {
+  const result = await pool.query(
+    `select d.id, d.file_name, d.file_size, d.file_type, d.file_data
+     from visa_application_documents d
+     join visa_applications a on a.id = d.application_id
+     where d.id = $2 and (a.id = $1 or a.applicant_id = $1)
+     limit 1`,
+    [String(applicationId), String(documentId)]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.file_name,
+    size: Number(row.file_size || 0),
+    type: row.file_type || 'application/octet-stream',
+    data: Buffer.isBuffer(row.file_data) ? row.file_data : Buffer.from(row.file_data || '')
+  };
 }
 
 function jsonStore() {
@@ -622,16 +722,84 @@ async function deleteEligibleJson(id) {
   return store.eligibleApplicants.length < before;
 }
 
+function ensureStoredDocumentIds(store) {
+  let mutated = false;
+  store.visaApplications.forEach((app) => {
+    (Array.isArray(app.uploads) ? app.uploads : []).forEach((upload) => {
+      (Array.isArray(upload.files) ? upload.files : []).forEach((file) => {
+        if (file && !file.id) {
+          file.id = makeId('doc');
+          mutated = true;
+        }
+      });
+    });
+  });
+  if (mutated) writeStore(store);
+}
+
+function toPublicApplicationJson(app) {
+  if (!app) return null;
+  return {
+    ...app,
+    uploads: (Array.isArray(app.uploads) ? app.uploads : []).map((upload) => ({
+      field: upload.field,
+      document: upload.document,
+      required: Boolean(upload.required),
+      files: (Array.isArray(upload.files) ? upload.files : []).map((file) => ({
+        id: file.id,
+        name: file.name,
+        size: Number(file.size || 0),
+        type: file.type
+      }))
+    }))
+  };
+}
+
 async function listApplicationsJson() {
-  return jsonStore().visaApplications;
+  const store = jsonStore();
+  ensureStoredDocumentIds(store);
+  return store.visaApplications.map(toPublicApplicationJson);
 }
 
 async function getApplicationJson(id) {
-  return jsonStore().visaApplications.find((item) => item.id === id || item.applicantId === id) || null;
+  const store = jsonStore();
+  ensureStoredDocumentIds(store);
+  const item = store.visaApplications.find((record) => record.id === id || record.applicantId === id);
+  return toPublicApplicationJson(item) || null;
 }
 
 async function getApplicationByPaymentReferenceJson(reference) {
-  return jsonStore().visaApplications.find((item) => item.paymentReference === reference) || null;
+  const store = jsonStore();
+  ensureStoredDocumentIds(store);
+  const item = store.visaApplications.find((record) => record.paymentReference === reference);
+  return toPublicApplicationJson(item) || null;
+}
+
+function mergeUploadsJson(existing, uploads) {
+  const storedFiles = new Map();
+  ((existing && existing.uploads) || []).forEach((upload) => {
+    (Array.isArray(upload.files) ? upload.files : []).forEach((file) => {
+      if (file && file.id) storedFiles.set(String(file.id), file);
+    });
+  });
+  return uploads.map((upload) => ({
+    field: String((upload && upload.field) || ''),
+    document: String((upload && upload.document) || ''),
+    required: Boolean(upload && upload.required),
+    files: (Array.isArray(upload && upload.files) ? upload.files : []).map((file) => {
+      if (file && file.dataUrl) {
+        const parsed = parseDataUrl(file);
+        return {
+          id: makeId('doc'),
+          name: String(file.name || 'upload'),
+          size: parsed.fileData.length,
+          type: parsed.fileType,
+          dataUrl: String(file.dataUrl)
+        };
+      }
+      return (file && file.id && storedFiles.get(String(file.id))) || null;
+    }).filter(Boolean)
+  }));
 }
 
 async function upsertApplicationJson(app) {
@@ -649,26 +817,99 @@ async function upsertApplicationJson(app) {
     paymentCurrency: app.paymentCurrency || (existing && existing.paymentCurrency) || 'NGN',
     paymentPaidAt: app.paymentPaidAt || (existing && existing.paymentPaidAt) || '',
     reviewedAt: app.reviewedAt || (existing && existing.reviewedAt) || '',
+    // Documents are only replaced when the caller explicitly provides uploads;
+    // omitting the key preserves stored documents (lightweight finalize path).
+    uploads: Array.isArray(app.uploads)
+      ? mergeUploadsJson(existing, app.uploads)
+      : ((existing && existing.uploads) || []),
     createdAt: (existing && existing.createdAt) || app.createdAt || now(),
     updatedAt: now()
   };
   if (existing) Object.assign(existing, application);
   else store.visaApplications.push(application);
   writeStore(store);
-  return existing || application;
+  return toPublicApplicationJson(existing || application);
 }
 
 async function updateApplicationJson(id, fields) {
   const store = jsonStore();
   const item = store.visaApplications.find((record) => record.id === id);
   if (!item) return null;
-  Object.assign(item, fields, { updatedAt: now() });
+  const { uploads, ...rest } = fields || {};
+  Object.assign(item, rest, { updatedAt: now() });
   writeStore(store);
-  return item;
+  return toPublicApplicationJson(item);
 }
 
 async function updateApplicationPaymentJson(id, fields) {
   return updateApplicationJson(id, fields);
+}
+
+async function setApplicationDocumentJson(applicationId, payload) {
+  const parsed = parseDataUrl(payload.file);
+  const store = jsonStore();
+  const id = String(applicationId);
+  let app = store.visaApplications.find((item) => item.id === id || item.applicantId === id);
+  if (!app) {
+    const applicant = store.eligibleApplicants.find((item) => item.id === id) || null;
+    app = {
+      id,
+      applicantId: id,
+      name: (applicant && applicant.name) || '',
+      email: (applicant && applicant.email) || '',
+      phone: (applicant && applicant.phone) || '',
+      applicantCategory: (applicant && applicant.category) || '',
+      status: 'Draft',
+      paymentStatus: 'Unpaid',
+      uploads: [],
+      createdAt: now(),
+      updatedAt: now()
+    };
+    store.visaApplications.push(app);
+  }
+  if (!Array.isArray(app.uploads)) app.uploads = [];
+  const field = String(payload.field || '');
+  let group = app.uploads.find((upload) => upload.field === field);
+  if (!group) {
+    group = { field, document: '', required: false, files: [] };
+    app.uploads.push(group);
+  }
+  group.document = String(payload.document || group.document || '');
+  group.required = Boolean(payload.required);
+  if (payload.replaceField) group.files = [];
+  group.files.push({
+    id: makeId('doc'),
+    name: String((payload.file && payload.file.name) || 'upload'),
+    size: parsed.fileData.length,
+    type: parsed.fileType,
+    dataUrl: String(payload.file.dataUrl)
+  });
+  app.updatedAt = now();
+  writeStore(store);
+  return toPublicApplicationJson(app);
+}
+
+async function getApplicationDocumentJson(applicationId, documentId) {
+  const store = jsonStore();
+  ensureStoredDocumentIds(store);
+  const id = String(applicationId);
+  const app = store.visaApplications.find((item) => item.id === id || item.applicantId === id);
+  if (!app) return null;
+  for (const upload of (Array.isArray(app.uploads) ? app.uploads : [])) {
+    for (const file of (Array.isArray(upload.files) ? upload.files : [])) {
+      if (file && String(file.id) === String(documentId)) {
+        const parsed = parseDataUrl(file);
+        return {
+          id: file.id,
+          name: String(file.name || 'upload'),
+          size: parsed.fileData.length,
+          type: parsed.fileType,
+          data: parsed.fileData
+        };
+      }
+    }
+  }
+  return null;
 }
 
 const postgresRepository = {
@@ -687,7 +928,9 @@ const postgresRepository = {
   getApplicationByPaymentReference: getApplicationByPaymentReferencePg,
   upsertApplication: upsertApplicationPg,
   updateApplication: updateApplicationPg,
-  updateApplicationPayment: updateApplicationPaymentPg
+  updateApplicationPayment: updateApplicationPaymentPg,
+  setApplicationDocument: setApplicationDocumentPg,
+  getApplicationDocument: getApplicationDocumentPg
 };
 
 const jsonRepository = {
@@ -706,7 +949,9 @@ const jsonRepository = {
   getApplicationByPaymentReference: getApplicationByPaymentReferenceJson,
   upsertApplication: upsertApplicationJson,
   updateApplication: updateApplicationJson,
-  updateApplicationPayment: updateApplicationPaymentJson
+  updateApplicationPayment: updateApplicationPaymentJson,
+  setApplicationDocument: setApplicationDocumentJson,
+  getApplicationDocument: getApplicationDocumentJson
 };
 
 module.exports = hasDatabase ? postgresRepository : jsonRepository;

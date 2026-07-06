@@ -32,6 +32,18 @@ function sendJson(res, status, data) {
   res.end(payload);
 }
 
+function sendBinaryFile(res, status, file) {
+  // ASCII-only fallback: Node rejects header values with code units > 0xFF.
+  // Full UTF-8 names travel in the filename* parameter below.
+  const safeName = String(file.name || 'document').replace(/[^\x20-\x7E]|["\\]/g, '_');
+  res.writeHead(status, {
+    'content-type': file.type || 'application/octet-stream',
+    'content-length': file.data.length,
+    'content-disposition': `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(String(file.name || 'document'))}`
+  });
+  res.end(file.data);
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
@@ -76,7 +88,7 @@ function sendStatic(req, res, pathname) {
       const canFallbackToSpa = staticRoot === angularRoot && (!ext || ext === '.html');
       if (canFallbackToSpa) {
         const fallback = path.join(staticRoot, 'index.html');
-        res.writeHead(200, { 'content-type': mimeTypes['.html'] });
+        res.writeHead(200, { 'content-type': mimeTypes['.html'], 'cache-control': 'no-cache' });
         fs.createReadStream(fallback).pipe(res);
         return;
       }
@@ -85,7 +97,10 @@ function sendStatic(req, res, pathname) {
       return;
     }
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'content-type': mimeTypes[ext] || 'application/octet-stream' });
+    const headers = { 'content-type': mimeTypes[ext] || 'application/octet-stream' };
+    // HTML must always revalidate so clients pick up new hashed bundles right after a deploy.
+    if (ext === '.html' || !ext) headers['cache-control'] = 'no-cache';
+    res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);
   });
 }
@@ -106,6 +121,10 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
       const result = await handleApi(req.method, url.pathname, body);
+      if (result && result.data && result.data.__binaryFile) {
+        sendBinaryFile(res, result.status, result.data.__binaryFile);
+        return;
+      }
       sendJson(res, result ? result.status : 404, result ? result.data : { error: 'API route not found' });
     } catch (error) {
       sendJson(res, error.message === 'Payload too large' ? 413 : 400, { error: error.message });

@@ -33,6 +33,15 @@ module.exports = async function handler(req, res) {
     const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
     const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
     const result = await handleApi(req.method, url.pathname, body);
+    if (result && result.data && result.data.__binaryFile) {
+      const file = result.data.__binaryFile;
+      // ASCII-only fallback: Node rejects header values with code units > 0xFF.
+      const safeName = String(file.name || 'document').replace(/[^\x20-\x7E]|["\\]/g, '_');
+      res.setHeader('content-type', file.type || 'application/octet-stream');
+      res.setHeader('content-disposition', `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(String(file.name || 'document'))}`);
+      res.status(result.status).send(file.data);
+      return;
+    }
     res.status(result ? result.status : 404).json(result ? result.data : { error: 'API route not found' });
   } catch (error) {
     res.status(error.message === 'Payload too large' ? 413 : 400).json({ error: error.message });

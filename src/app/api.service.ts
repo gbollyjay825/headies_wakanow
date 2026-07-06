@@ -32,10 +32,11 @@ export interface EligibleApplicant {
 }
 
 export interface UploadedFileRecord {
+  id?: string;
   name: string;
   size: number;
   type: string;
-  dataUrl: string;
+  dataUrl?: string;
 }
 
 export interface PassportParsedFields {
@@ -94,7 +95,7 @@ export interface VisaApplication {
   reviewedAt?: string;
   passportDetails?: PassportParseResult | null;
   reviewConfirmed?: boolean;
-  uploads: UploadGroup[];
+  uploads?: UploadGroup[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -190,6 +191,20 @@ export class ApiService {
       method: 'POST',
       body: JSON.stringify(application)
     });
+  }
+
+  uploadApplicationDocument(
+    applicationId: string,
+    payload: { field: string; document: string; required: boolean; replaceField: boolean; file: UploadedFileRecord }
+  ): Promise<{ application: VisaApplication }> {
+    return this.request(`/api/visa/applications/${encodeURIComponent(applicationId)}/documents`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  documentDownloadUrl(applicationId: string, fileId: string): string {
+    return `/api/visa/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(fileId)}`;
   }
 
   updateApplication(id: string, fields: Partial<VisaApplication>): Promise<{ application: VisaApplication }> {

@@ -27,6 +27,65 @@ function safePaymentFields(application) {
   };
 }
 
+const DOC_FIELD_LABELS = {
+  applicationForm: 'Completed Canada visa application form',
+  resume: 'Updated CV / resume',
+  passport: 'Valid passport',
+  previousVisas: 'Previous and current visas',
+  bankStatements: 'Bank statements',
+  taxClearance: 'Personal tax clearance certificate',
+  employmentLetter: 'Employment letter',
+  paySlips: '6 months pay slips',
+  staffId: 'Staff ID card',
+  introductionLetter: 'Introduction letter from employer',
+  cac: 'CAC registration documents',
+  companyIntro: 'Company introduction letter',
+  companyTax: 'Company tax clearance certificate',
+  businessBank: 'Business and personal bank statements'
+};
+
+function requiredDocFieldsFor(category) {
+  const value = String(category || '').trim();
+  const fields = ['applicationForm', 'resume', 'passport', 'previousVisas', 'bankStatements', 'taxClearance'];
+  if (value === 'employed' || value === 'employed-business-owner') {
+    fields.push('employmentLetter', 'paySlips', 'staffId', 'introductionLetter');
+  }
+  if (value === 'business-owner' || value === 'employed-business-owner') {
+    fields.push('cac', 'companyIntro', 'companyTax', 'businessBank');
+  }
+  return fields;
+}
+
+/**
+ * Fields that will have at least one document AFTER persistence runs.
+ * Mirrors the upsert contract exactly: when the body omits `uploads`, stored
+ * documents are preserved as-is; when it provides them, stored documents are
+ * replaced by files carrying a dataUrl plus metadata echoes whose id matches a
+ * currently stored document (stale/fabricated ids do not survive).
+ */
+function uploadedFieldSet(existing, bodyUploads) {
+  const fields = new Set();
+  const storedIds = new Set();
+  ((existing && existing.uploads) || []).forEach((upload) => {
+    (Array.isArray(upload.files) ? upload.files : []).forEach((file) => {
+      if (file && file.id) storedIds.add(String(file.id));
+    });
+  });
+  if (!Array.isArray(bodyUploads)) {
+    ((existing && existing.uploads) || []).forEach((upload) => {
+      if (Array.isArray(upload.files) && upload.files.length) fields.add(String(upload.field || ''));
+    });
+    return fields;
+  }
+  bodyUploads.forEach((upload) => {
+    const surviving = (Array.isArray(upload && upload.files) ? upload.files : []).filter((file) => (
+      file && (file.dataUrl || (file.id && storedIds.has(String(file.id))))
+    ));
+    if (surviving.length) fields.add(String(upload.field || ''));
+  });
+  return fields;
+}
+
 async function handleApi(method, pathname, body = {}) {
   const parts = pathname.split('/').filter(Boolean);
   if (parts[0] !== 'api') return null;
@@ -152,29 +211,33 @@ async function handleApi(method, pathname, body = {}) {
           paymentCurrency: currency
         };
         const existing = await repository.getApplication(applicationId);
-        const application = existing
-          ? await repository.updateApplicationPayment(applicationId, paymentFields)
-          : await repository.upsertApplication({
-              id: applicationId,
-              applicantId: body.applicantId || applicationId,
-              name: body.name || '',
-              email,
-              phone: body.phone || '',
-              applicants: String(applicants),
-              applicantCategory: body.applicantCategory || '',
-              passportExpiry: body.passportExpiry || '',
-              travelDate: body.travelDate || '',
-              travelHistory: body.travelHistory || '',
-              role: body.role || '',
-              salary: body.salary || '',
-              employmentLength: body.employmentLength || '',
-              notes: body.notes || '',
-              fee: 'NGN745,000 per applicant package: visa fee included, admin processing fee included, Headies ticket fee included',
-              status: 'Draft',
-              uploads: [],
-              passportDetails: body.passportDetails || null,
-              ...paymentFields
-            });
+        // Persist the applicant profile alongside the payment fields so a user
+        // who pays but never completes the final submit still has an
+        // identifiable application. `uploads` is intentionally omitted so
+        // documents saved before payment are preserved.
+        const application = await repository.upsertApplication({
+          id: applicationId,
+          applicantId: body.applicantId || applicationId,
+          name: body.name || (existing && existing.name) || '',
+          email,
+          phone: body.phone || (existing && existing.phone) || '',
+          applicants: String(applicants),
+          applicantCategory: body.applicantCategory || (existing && existing.applicantCategory) || '',
+          passportExpiry: body.passportExpiry || (existing && existing.passportExpiry) || '',
+          travelDate: body.travelDate || (existing && existing.travelDate) || '',
+          travelHistory: body.travelHistory || (existing && existing.travelHistory) || '',
+          role: body.role || (existing && existing.role) || '',
+          salary: body.salary || (existing && existing.salary) || '',
+          employmentLength: body.employmentLength || (existing && existing.employmentLength) || '',
+          notes: body.notes || (existing && existing.notes) || '',
+          fee: 'NGN745,000 per applicant package: visa fee included, admin processing fee included, Headies ticket fee included',
+          status: (existing && existing.status) || 'Draft',
+          passportDetails: body.passportDetails || (existing && existing.passportDetails) || null,
+          reviewedAt: (existing && existing.reviewedAt) || '',
+          paymentPaidAt: (existing && existing.paymentPaidAt) || '',
+          createdAt: (existing && existing.createdAt) || undefined,
+          ...paymentFields
+        });
 
         return response(200, {
           application,
@@ -237,6 +300,35 @@ async function handleApi(method, pathname, body = {}) {
       if (!application) return response(404, { error: 'Application not found' });
       return response(200, { application });
     }
+    if (method === 'POST' && parts.length === 5 && parts[4] === 'documents') {
+      const file = body.file;
+      const field = String(body.field || '').trim();
+      if (!field) return response(400, { error: 'Document field is required.' });
+      if (!file || typeof file !== 'object' || !file.dataUrl) {
+        return response(400, { error: 'A file with its data is required.' });
+      }
+      try {
+        const application = await repository.setApplicationDocument(parts[3], {
+          field,
+          document: String(body.document || ''),
+          required: Boolean(body.required),
+          replaceField: Boolean(body.replaceField),
+          file
+        });
+        return response(200, { application });
+      } catch (error) {
+        return response(error.status || 400, { error: error.message || 'Could not save the document.' });
+      }
+    }
+    if (method === 'GET' && parts.length === 6 && parts[4] === 'documents') {
+      try {
+        const document = await repository.getApplicationDocument(parts[3], parts[5]);
+        if (!document) return response(404, { error: 'Document not found' });
+        return response(200, { __binaryFile: document });
+      } catch {
+        return response(404, { error: 'Document data is missing. Ask the applicant to upload it again.' });
+      }
+    }
     if (method === 'POST' && parts.length === 3) {
       const nextBody = { ...body };
       if (nextBody.status === 'Submitted') {
@@ -248,12 +340,32 @@ async function handleApi(method, pathname, body = {}) {
         if (nextBody.reviewConfirmed !== true) {
           return response(400, { error: 'Review confirmation is required before submission.' });
         }
+        const category = nextBody.applicantCategory || existing.applicantCategory;
+        const uploaded = uploadedFieldSet(existing, nextBody.uploads);
+        const missing = requiredDocFieldsFor(category).filter((field) => !uploaded.has(field));
+        if (missing.length) {
+          const labels = missing.map((field) => DOC_FIELD_LABELS[field] || field).join(', ');
+          return response(400, { error: `Upload the required documents before submission: ${labels}.` });
+        }
         Object.assign(nextBody, safePaymentFields(existing), { reviewedAt: now() });
       }
       const application = await repository.upsertApplication(nextBody);
       return response(201, { application });
     }
     if (method === 'PATCH' && parts.length === 4) {
+      if (body.status === 'Submitted') {
+        const existing = await repository.getApplication(parts[3]);
+        if (!existing) return response(404, { error: 'Application not found' });
+        if (existing.paymentStatus !== 'Paid') {
+          return response(402, { error: 'Verified payment is required before submission.' });
+        }
+        const uploaded = uploadedFieldSet(existing, undefined);
+        const missing = requiredDocFieldsFor(existing.applicantCategory).filter((field) => !uploaded.has(field));
+        if (missing.length) {
+          const labels = missing.map((field) => DOC_FIELD_LABELS[field] || field).join(', ');
+          return response(400, { error: `Upload the required documents before submission: ${labels}.` });
+        }
+      }
       const application = await repository.updateApplication(parts[3], body);
       if (!application) return response(404, { error: 'Application not found' });
       return response(200, { application });

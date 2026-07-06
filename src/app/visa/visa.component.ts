@@ -275,6 +275,7 @@ interface UploadDoc {
                     <input type="file" [attr.multiple]="doc.field.includes('Statements') || doc.field.includes('Visas') ? true : null" [required]="doc.required" (change)="handleFiles(doc, $event)">
                   </div>
                 </div>
+                  <p class="form-status" role="status">{{ uploadStatus }}</p>
 
                   <section *ngIf="showsSection('employed')" style="margin-top:22px">
                   <h3 style="margin:0 0 12px;font-size:18px">Employment details</h3>
@@ -326,6 +327,8 @@ interface UploadDoc {
   `
 })
 export class VisaComponent implements OnInit {
+  static readonly MAX_FILE_BYTES = 20 * 1024 * 1024;
+
   authMode: 'login' | 'signup' = 'login';
   mobileMenuOpen = false;
   portalVisible = false;
@@ -334,6 +337,9 @@ export class VisaComponent implements OnInit {
   applicationStatus = '';
   passportStatus = '';
   paymentStatus = '';
+  uploadStatus = '';
+  uploadErrors = new Map<string, string>();
+  uploadsInFlight = 0;
   paymentWorking = false;
   uploadUnlocked = false;
   reviewConfirmed = false;
@@ -570,7 +576,13 @@ export class VisaComponent implements OnInit {
     try {
       const { application } = await this.api.getApplication(applicant.id);
       this.existingApplication = application;
-      this.application = { ...this.application, ...application };
+      this.mergeApplication(application);
+      // A bare draft row (created by an early document upload) must never blank
+      // out the profile fields prefilled from the signed-in applicant.
+      this.application.name = this.application.name || applicant.name;
+      this.application.email = this.application.email || applicant.email;
+      this.application.phone = this.application.phone || applicant.phone;
+      this.application.applicantCategory = this.application.applicantCategory || applicant.category;
       this.hydrateUploads(application.uploads || []);
       this.uploadUnlocked = this.paymentPaid || Boolean((application.uploads || []).some((upload) => (upload.files || []).length));
       if (application.passportDetails?.parsed) {
@@ -597,9 +609,19 @@ export class VisaComponent implements OnInit {
     this.docs.forEach((doc) => doc.files = []);
     this.passportStatus = '';
     this.paymentStatus = '';
+    this.uploadStatus = '';
+    this.uploadErrors.clear();
+    this.uploadsInFlight = 0;
     this.paymentWorking = false;
     this.uploadUnlocked = false;
     this.reviewConfirmed = false;
+  }
+
+  /** Merge server fields into local state without letting server upload
+   *  metadata leak into the payloads we later POST back. */
+  mergeApplication(application: VisaApplication): void {
+    const { uploads, ...fields } = application;
+    this.application = { ...this.application, ...fields };
   }
 
   openUploadsBeforePayment(): void {
@@ -625,9 +647,10 @@ export class VisaComponent implements OnInit {
         ...this.application,
         id: this.currentApplicant.id,
         applicantId: this.currentApplicant.id,
-        applicants: String(this.applicantCount)
+        applicants: String(this.applicantCount),
+        uploads: undefined
       }, callbackUrl);
-      this.application = { ...this.application, ...application };
+      this.mergeApplication(application);
       this.existingApplication = application;
       this.paymentStatus = 'Redirecting to Paystack...';
       location.href = payment.authorizationUrl;
@@ -646,8 +669,9 @@ export class VisaComponent implements OnInit {
     this.paymentStatus = 'Verifying Paystack payment...';
     try {
       const { application, payment } = await this.api.verifyPaystackPayment(reference);
-      this.application = { ...this.application, ...application };
+      this.mergeApplication(application);
       this.existingApplication = application;
+      this.hydrateUploads(application.uploads || []);
       this.paymentStatus = payment.verified ? 'Payment verified. Continue upload and review.' : 'Payment could not be verified.';
       if (payment.verified) this.uploadUnlocked = true;
     } catch (error) {
@@ -665,7 +689,74 @@ export class VisaComponent implements OnInit {
   }
 
   handleFiles(doc: UploadDoc, event: Event): void {
-    doc.files = Array.from((event.target as HTMLInputElement).files || []);
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    void this.uploadDocumentFiles(doc, files, input);
+  }
+
+  /** Uploads each selected file to the server immediately so documents are
+   *  persisted before payment and survive the Paystack redirect. */
+  async uploadDocumentFiles(doc: UploadDoc, files: File[], input?: HTMLInputElement): Promise<void> {
+    if (!this.currentApplicant) {
+      this.uploadStatus = 'Sign in again before uploading documents.';
+      return;
+    }
+    const oversized = files.find((file) => file.size > VisaComponent.MAX_FILE_BYTES);
+    if (oversized) {
+      this.uploadErrors.set(doc.field, `${oversized.name} is larger than 20MB. Compress it and select it again.`);
+      if (input) input.value = '';
+      this.refreshUploadStatus();
+      return;
+    }
+    doc.files = files;
+    this.uploadsInFlight += 1;
+    this.refreshUploadStatus();
+    try {
+      let replaceField = true;
+      let application: VisaApplication | null = null;
+      for (const file of files) {
+        const record = await this.fileToData(file);
+        const result = await this.api.uploadApplicationDocument(this.currentApplicant.id, {
+          field: doc.field,
+          document: doc.document,
+          required: doc.required,
+          replaceField,
+          file: record
+        });
+        application = result.application;
+        replaceField = false;
+      }
+      if (application) {
+        const group = (application.uploads || []).find((upload) => upload.field === doc.field);
+        doc.files = group ? group.files : [];
+      }
+      this.uploadErrors.delete(doc.field);
+    } catch (error) {
+      doc.files = [];
+      if (input) input.value = '';
+      this.uploadErrors.set(doc.field, error instanceof Error && error.message && error.message !== 'Request failed'
+        ? `Could not save ${doc.document}: ${error.message}`
+        : `Could not save ${doc.document}. Check your connection and select the file again.`);
+    } finally {
+      this.uploadsInFlight -= 1;
+      this.refreshUploadStatus();
+    }
+  }
+
+  /** Composes one status line from in-flight uploads and per-document errors so
+   *  a later success can never hide an earlier failure. */
+  refreshUploadStatus(): void {
+    const errors = Array.from(this.uploadErrors.values());
+    if (errors.length) {
+      this.uploadStatus = errors.join(' ');
+      return;
+    }
+    if (this.uploadsInFlight > 0) {
+      this.uploadStatus = 'Saving documents...';
+      return;
+    }
+    this.uploadStatus = this.fileCount ? 'All selected documents are saved to your application.' : '';
   }
 
   fileSize(bytes: number): string {
@@ -683,12 +774,43 @@ export class VisaComponent implements OnInit {
   }
 
   async parsePassportDataPage(event: Event): Promise<void> {
-    const file = ((event.target as HTMLInputElement).files || [])[0];
+    const input = event.target as HTMLInputElement;
+    const file = (input.files || [])[0];
     if (!file) return;
+    if (file.size > VisaComponent.MAX_FILE_BYTES) {
+      this.passportStatus = `${file.name} is larger than 20MB. Compress it and select it again.`;
+      input.value = '';
+      return;
+    }
 
     this.passportStatus = 'Reading passport image...';
     const passportFile = await this.fileToData(file);
     this.passportDoc.files = [passportFile];
+
+    // Persist the passport image immediately so it survives the Paystack redirect.
+    if (this.currentApplicant) {
+      this.passportStatus = 'Saving passport image...';
+      try {
+        const { application } = await this.api.uploadApplicationDocument(this.currentApplicant.id, {
+          field: this.passportDoc.field,
+          document: this.passportDoc.document,
+          required: this.passportDoc.required,
+          replaceField: true,
+          file: passportFile
+        });
+        const group = (application.uploads || []).find((upload) => upload.field === this.passportDoc.field);
+        if (group) this.passportDoc.files = group.files;
+      } catch (error) {
+        // Keep the UI honest: the passport is NOT attached, and reset the input
+        // so re-selecting the same file fires a change event again.
+        this.passportDoc.files = [];
+        input.value = '';
+        this.passportStatus = error instanceof Error && error.message && error.message !== 'Request failed'
+          ? `Could not save the passport image: ${error.message} Select it again to retry.`
+          : 'Could not save the passport image. Check your connection and select it again.';
+        return;
+      }
+    }
 
     try {
       this.passportStatus = 'Extracting passport details...';
@@ -698,7 +820,7 @@ export class VisaComponent implements OnInit {
       this.passportStatus = 'Passport image saved and details extracted.';
     } catch (error) {
       this.application.passportDetails = null;
-      this.passportStatus = error instanceof Error
+      this.passportStatus = error instanceof Error && error.message && error.message !== 'Request failed'
         ? `Image saved, but extraction failed: ${error.message}`
         : 'Image saved, but extraction failed. Enter passport expiry manually.';
     }
@@ -730,7 +852,7 @@ export class VisaComponent implements OnInit {
   }
 
   async fileToData(file: UploadFile): Promise<UploadedFileRecord> {
-    if ('dataUrl' in file) return file;
+    if (!(file instanceof File)) return file;
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result || ''));
@@ -758,28 +880,25 @@ export class VisaComponent implements OnInit {
       return;
     }
     this.applicationStatus = 'Saving application...';
-    const uploads: UploadGroup[] = [];
-    for (const doc of this.activeDocs) {
-      uploads.push({
-        field: doc.field,
-        document: doc.document,
-        required: doc.required,
-        files: await Promise.all(doc.files.map((file) => this.fileToData(file)))
-      });
-    }
     try {
-      const { application } = await this.api.saveApplication({
+      // Documents are already persisted server-side as they were selected.
+      // Omitting `uploads` keeps the submit payload tiny and tells the server
+      // to leave the stored documents untouched.
+      const payload: VisaApplication = {
         ...this.application,
-        uploads,
         status: 'Submitted',
         reviewConfirmed: true
-      });
+      };
+      delete payload.uploads;
+      const { application } = await this.api.saveApplication(payload);
       this.existingApplication = application;
-      this.application = { ...this.application, ...application };
+      this.mergeApplication(application);
       this.hydrateUploads(application.uploads || []);
       this.applicationStatus = 'Application submitted for admin review.';
     } catch (error) {
-      this.applicationStatus = 'Could not save application.';
+      this.applicationStatus = error instanceof Error && error.message && error.message !== 'Request failed'
+        ? error.message
+        : 'Could not save application. Check your connection and try again.';
     }
   }
 }

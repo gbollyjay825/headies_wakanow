@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
+import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } from '../api.service';
 
 @Component({
   selector: 'app-admin',
@@ -50,6 +50,8 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                 <button class="btn btn-danger btn-small" type="button" (click)="logout()">Sign out</button>
               </div>
             </div>
+
+            <p class="form-status" role="status">{{ dashboardStatus }}</p>
 
             <div class="stat-grid stat-grid--admin">
               <div class="stat-card"><span>Preloaded emails</span><strong>{{ applicants.length }}</strong></div>
@@ -141,7 +143,7 @@ import { ApiService, EligibleApplicant, VisaApplication } from '../api.service';
                               <ng-container *ngFor="let upload of app.uploads">
                                 <li *ngFor="let file of upload.files">
                                   <span>{{ upload.document }} · {{ file.name }} · {{ fileSize(file.size) }}</span>
-                                  <a class="doc-link" [href]="file.dataUrl" [download]="file.name">Download</a>
+                                  <a class="doc-link" *ngIf="file.id" [href]="docUrl(app, file)">Download</a>
                                 </li>
                               </ng-container>
                             </ul>
@@ -235,6 +237,7 @@ export class AdminComponent implements OnInit {
   addStatus = '';
   importStatus = '';
   accessStatus = '';
+  dashboardStatus = '';
   importWorking = false;
   isAdmin = sessionStorage.getItem('headiesVisaAdminSession') === 'true';
   applicants: EligibleApplicant[] = [];
@@ -285,12 +288,24 @@ export class AdminComponent implements OnInit {
   }
 
   async loadDashboard(): Promise<void> {
-    const [eligible, apps] = await Promise.all([
-      this.api.listEligible(),
-      this.api.listApplications()
-    ]);
-    this.applicants = eligible.applicants;
-    this.applications = apps.applications.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
+    this.dashboardStatus = 'Loading dashboard...';
+    try {
+      const [eligible, apps] = await Promise.all([
+        this.api.listEligible(),
+        this.api.listApplications()
+      ]);
+      this.applicants = eligible.applicants;
+      this.applications = apps.applications.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
+      this.dashboardStatus = '';
+    } catch (error) {
+      this.dashboardStatus = error instanceof Error && error.message && error.message !== 'Request failed'
+        ? `Could not load the dashboard: ${error.message}`
+        : 'Could not load the dashboard. Use Refresh to try again.';
+    }
+  }
+
+  docUrl(app: VisaApplication, file: UploadedFileRecord): string {
+    return this.api.documentDownloadUrl(app.id, String(file.id));
   }
 
   async addApplicant(valid: boolean | null): Promise<void> {
@@ -328,8 +343,17 @@ export class AdminComponent implements OnInit {
   }
 
   async updateApplicationStatus(app: VisaApplication, status: VisaApplication['status']): Promise<void> {
-    await this.api.updateApplication(app.id, { status });
-    await this.loadDashboard();
+    const previous = app.status;
+    app.status = status;
+    try {
+      await this.api.updateApplication(app.id, { status });
+      await this.loadDashboard();
+    } catch (error) {
+      app.status = previous;
+      this.dashboardStatus = error instanceof Error && error.message && error.message !== 'Request failed'
+        ? `Could not update the status: ${error.message}`
+        : 'Could not update the application status. Try again.';
+    }
   }
 
   setImportFile(event: Event): void {
