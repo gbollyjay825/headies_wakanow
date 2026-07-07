@@ -74,6 +74,98 @@ function iso(value) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
+const MONTH_INDEX = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12
+};
+
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function normalizeYear(value) {
+  const year = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(year)) return 0;
+  if (year < 100) return year < 50 ? 2000 + year : 1900 + year;
+  return year;
+}
+
+function validIsoDate(yearValue, monthValue, dayValue) {
+  const year = normalizeYear(yearValue);
+  const month = Number.parseInt(String(monthValue || ''), 10);
+  const day = Number.parseInt(String(dayValue || ''), 10);
+  if (!year || !month || !day || month < 1 || month > 12 || day < 1 || day > 31) return '';
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return '';
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function normalizeDateInput(value) {
+  if (!value) return '';
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return '';
+    return validIsoDate(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+  }
+
+  const text = String(value).trim();
+  if (!text) return '';
+
+  const isoDate = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/);
+  if (isoDate) return validIsoDate(isoDate[1], isoDate[2], isoDate[3]);
+
+  const dayMonthYear = text.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+  if (dayMonthYear) return validIsoDate(dayMonthYear[3], dayMonthYear[2], dayMonthYear[1]);
+
+  const yearMonthDay = text.match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/);
+  if (yearMonthDay) return validIsoDate(yearMonthDay[1], yearMonthDay[2], yearMonthDay[3]);
+
+  const mrzDate = text.match(/^(\d{2})(\d{2})(\d{2})$/);
+  if (mrzDate) return validIsoDate(mrzDate[1], mrzDate[2], mrzDate[3]);
+
+  const monthDayYear = text.match(/^(?:(?:mon|tue|wed|thu|fri|sat|sun)\w*\s+)?([a-z]+)\s+(\d{1,2})(?:,?\s+(\d{2,4}))$/i);
+  if (monthDayYear) {
+    const month = MONTH_INDEX[monthDayYear[1].toLowerCase()];
+    return month ? validIsoDate(monthDayYear[3], month, monthDayYear[2]) : '';
+  }
+
+  const dayTextMonthYear = text.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{2,4})$/i);
+  if (dayTextMonthYear) {
+    const month = MONTH_INDEX[dayTextMonthYear[2].toLowerCase()];
+    return month ? validIsoDate(dayTextMonthYear[3], month, dayTextMonthYear[1]) : '';
+  }
+
+  if (/\d{4}/.test(text)) {
+    const parsed = new Date(text);
+    if (!Number.isNaN(parsed.getTime())) {
+      return validIsoDate(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1, parsed.getUTCDate());
+    }
+  }
+
+  return '';
+}
+
 function toRequest(row) {
   return {
     id: row.id,
@@ -497,8 +589,8 @@ async function upsertApplicationPg(app) {
         parsePositiveInt(app.applicants, 1),
         String(app.applicantCategory || ''),
         userType,
-        String(app.passportExpiry || ''),
-        String(app.travelDate || ''),
+        normalizeDateInput(app.passportExpiry),
+        normalizeDateInput(app.travelDate),
         String(app.travelHistory || ''),
         String(app.role || ''),
         String(app.salary || ''),

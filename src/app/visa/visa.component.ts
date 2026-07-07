@@ -683,6 +683,7 @@ export class VisaComponent implements OnInit {
     this.paymentWorking = true;
     this.paymentStatus = 'Recording staff visa access...';
     try {
+      this.normalizeApplicationDates();
       const { application, payment } = await this.api.initializePaystackPayment({
         ...this.application,
         id: this.currentApplicant.id,
@@ -719,6 +720,7 @@ export class VisaComponent implements OnInit {
     this.paymentWorking = true;
     this.paymentStatus = 'Preparing secure Paystack checkout...';
     try {
+      this.normalizeApplicationDates();
       const callbackUrl = `${location.origin}/visa`;
       const { application, payment } = await this.api.initializePaystackPayment({
         ...this.application,
@@ -905,27 +907,89 @@ export class VisaComponent implements OnInit {
 
   applyPassportDetails(details: PassportParseResult): void {
     const expiry = this.toDateInput(details.parsed?.expirationDate);
-    if (expiry) this.application.passportExpiry = expiry;
+    this.application.passportExpiry = expiry || '';
   }
 
   toDateInput(value?: string): string {
     const text = String(value || '').trim();
     if (!text) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const validIso = (yearValue: string | number, monthValue: string | number, dayValue: string | number): string => {
+      const rawYear = Number.parseInt(String(yearValue), 10);
+      const year = rawYear < 100 ? (rawYear < 50 ? 2000 + rawYear : 1900 + rawYear) : rawYear;
+      const month = Number.parseInt(String(monthValue), 10);
+      const day = Number.parseInt(String(dayValue), 10);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (
+        !Number.isFinite(year) ||
+        !Number.isFinite(month) ||
+        !Number.isFinite(day) ||
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+      ) return '';
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    };
+    const months: Record<string, number> = {
+      jan: 1, january: 1,
+      feb: 2, february: 2,
+      mar: 3, march: 3,
+      apr: 4, april: 4,
+      may: 5,
+      jun: 6, june: 6,
+      jul: 7, july: 7,
+      aug: 8, august: 8,
+      sep: 9, sept: 9, september: 9,
+      oct: 10, october: 10,
+      nov: 11, november: 11,
+      dec: 12, december: 12
+    };
+
+    const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/);
+    if (iso) return validIso(iso[1], iso[2], iso[3]);
 
     const separated = text.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
     if (separated) {
       const [, day, month, year] = separated;
-      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      return validIso(year, month, day);
+    }
+
+    const yearFirst = text.match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/);
+    if (yearFirst) {
+      const [, year, month, day] = yearFirst;
+      return validIso(year, month, day);
     }
 
     const mrzDate = text.match(/^(\d{2})(\d{2})(\d{2})$/);
     if (mrzDate) {
       const [, year, month, day] = mrzDate;
-      const fullYear = Number(year) < 50 ? `20${year}` : `19${year}`;
-      return `${fullYear}-${month}-${day}`;
+      return validIso(year, month, day);
     }
+
+    const textMonth = text.match(/^(?:(?:mon|tue|wed|thu|fri|sat|sun)\w*\s+)?([a-z]+)\s+(\d{1,2})(?:,?\s+(\d{2,4}))$/i);
+    if (textMonth) {
+      const month = months[textMonth[1].toLowerCase()];
+      return month ? validIso(textMonth[3], month, textMonth[2]) : '';
+    }
+
+    const dayTextMonth = text.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{2,4})$/i);
+    if (dayTextMonth) {
+      const month = months[dayTextMonth[2].toLowerCase()];
+      return month ? validIso(dayTextMonth[3], month, dayTextMonth[1]) : '';
+    }
+
+    if (/\d{4}/.test(text)) {
+      const parsed = new Date(text);
+      if (!Number.isNaN(parsed.getTime())) {
+        return validIso(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1, parsed.getUTCDate());
+      }
+    }
+
     return '';
+  }
+
+  normalizeApplicationDates(): void {
+    this.application.passportExpiry = this.toDateInput(this.application.passportExpiry);
+    this.application.travelDate = this.toDateInput(this.application.travelDate);
   }
 
   async fileToData(file: UploadFile): Promise<UploadedFileRecord> {
@@ -960,6 +1024,7 @@ export class VisaComponent implements OnInit {
     }
     this.applicationStatus = 'Saving application...';
     try {
+      this.normalizeApplicationDates();
       // Documents are already persisted server-side as they were selected.
       // Omitting `uploads` keeps the submit payload tiny and tells the server
       // to leave the stored documents untouched.
