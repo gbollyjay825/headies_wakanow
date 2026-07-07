@@ -9,6 +9,9 @@ const {
   verifyPaystackTransaction
 } = require('./paystack');
 
+const ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || 'HEADIES2026';
+const SUPER_ADMIN_PASSCODE = process.env.SUPER_ADMIN_PASSCODE || 'HEADIES2027';
+
 function response(status, data) {
   return { status, data };
 }
@@ -23,8 +26,59 @@ function safePaymentFields(application) {
     paymentReference: application.paymentReference,
     paymentAmount: application.paymentAmount,
     paymentCurrency: application.paymentCurrency,
-    paymentPaidAt: application.paymentPaidAt
+    paymentPaidAt: application.paymentPaidAt,
+    userType: application.userType
   };
+}
+
+function normalizeUserType(value) {
+  const type = String(value || '').trim().toLowerCase();
+  return ['basic', 'premium', 'staff'].includes(type) ? type : 'basic';
+}
+
+function requestSuperCode(body, req) {
+  return String(
+    (req && req.headers && (req.headers['x-super-admin-code'] || req.headers['X-Super-Admin-Code'])) ||
+    body.superAdminCode ||
+    ''
+  ).trim();
+}
+
+function adminRoleForCode(code) {
+  if (String(code || '').trim() === SUPER_ADMIN_PASSCODE) return 'super';
+  if (String(code || '').trim() === ADMIN_PASSCODE) return 'admin';
+  return '';
+}
+
+function isSuperAdminRequest(body, req) {
+  return adminRoleForCode(requestSuperCode(body, req)) === 'super';
+}
+
+function requireSuperAdmin(body, req) {
+  if (isSuperAdminRequest(body, req)) return null;
+  return response(403, { error: 'Super admin access is required for this action.' });
+}
+
+function userTypeLabel(userType) {
+  if (userType === 'premium') return 'Premium';
+  if (userType === 'staff') return 'Staff';
+  return 'Basic';
+}
+
+function feeLabelFor(userType) {
+  if (userType === 'staff') return 'Staff visa package: no payment required';
+  return `${userTypeLabel(userType)} visa package: visa fee included, admin processing fee included, Headies ticket fee included`;
+}
+
+function makeStaffReference(applicationId) {
+  const safeId = String(applicationId || 'visa').replace(/[^a-zA-Z0-9.-=]/g, '').slice(0, 24) || 'visa';
+  return `staff-${safeId}-${Date.now().toString(36)}`;
+}
+
+function priceForUserType(pricing, userType) {
+  if (userType === 'premium') return Number(pricing.premium || 0);
+  if (userType === 'staff') return 0;
+  return Number(pricing.basic || 0);
 }
 
 const DOC_FIELD_LABELS = {
@@ -86,7 +140,7 @@ function uploadedFieldSet(existing, bodyUploads) {
   return fields;
 }
 
-async function handleApi(method, pathname, body = {}) {
+async function handleApi(method, pathname, body = {}, req = null) {
   const parts = pathname.split('/').filter(Boolean);
   if (parts[0] !== 'api') return null;
 
@@ -96,6 +150,12 @@ async function handleApi(method, pathname, body = {}) {
       service: 'headies-wakanow-api',
       storage: repository.mode
     });
+  }
+
+  if (parts[1] === 'admin' && method === 'POST' && parts[2] === 'authorize') {
+    const role = adminRoleForCode(body.passcode);
+    if (!role) return response(401, { error: 'Invalid admin passcode.' });
+    return response(200, { role, superAdmin: role === 'super' });
   }
 
   if (parts[1] === 'requests') {
@@ -130,6 +190,7 @@ async function handleApi(method, pathname, body = {}) {
           email: applicant.email,
           phone: applicant.phone,
           category: applicant.category,
+          userType: applicant.userType,
           status: applicant.status,
           source: applicant.source,
           notes: applicant.notes,
@@ -146,22 +207,51 @@ async function handleApi(method, pathname, body = {}) {
     }
     if (method === 'POST' && parts[2] === 'import') {
       const records = Array.isArray(body.records) ? body.records : [];
-      const applicants = await repository.upsertEligibleRecords(records);
-      return response(200, { count: records.length, applicants });
+      try {
+        const applicants = await repository.upsertEligibleRecords(records, {
+          allowExistingUpdates: isSuperAdminRequest(body, req),
+          allowPrivilegedUserTypes: isSuperAdminRequest(body, req)
+        });
+        return response(200, { count: records.length, applicants });
+      } catch (error) {
+        return response(error.status || 400, { error: error.message || 'Could not import approved applicants.' });
+      }
     }
     if (method === 'POST' && parts.length === 2) {
-      const applicants = await repository.upsertEligibleRecords([body]);
-      return response(201, { count: 1, applicants });
+      try {
+        const applicants = await repository.upsertEligibleRecords([body], {
+          allowExistingUpdates: isSuperAdminRequest(body, req),
+          allowPrivilegedUserTypes: isSuperAdminRequest(body, req)
+        });
+        return response(201, { count: 1, applicants });
+      } catch (error) {
+        return response(error.status || 400, { error: error.message || 'Could not preload applicant.' });
+      }
     }
     if (method === 'PATCH' && parts.length === 3) {
+      const denied = requireSuperAdmin(body, req);
+      if (denied) return denied;
       const updated = await repository.updateEligible(parts[2], body);
       if (!updated) return response(404, { error: 'Eligible applicant not found' });
       return response(200, { applicant: updated });
     }
     if (method === 'DELETE' && parts.length === 3) {
+      const denied = requireSuperAdmin(body, req);
+      if (denied) return denied;
       const deleted = await repository.deleteEligible(parts[2]);
       if (!deleted) return response(404, { error: 'Eligible applicant not found' });
       return response(200, { ok: true });
+    }
+  }
+
+  if (parts[1] === 'visa' && parts[2] === 'pricing') {
+    if (method === 'GET' && parts.length === 3) {
+      return response(200, { pricing: await repository.getVisaPricing() });
+    }
+    if (method === 'PATCH' && parts.length === 3) {
+      const denied = requireSuperAdmin(body, req);
+      if (denied) return denied;
+      return response(200, { pricing: await repository.updateVisaPricing(body.pricing || body) });
     }
   }
 
@@ -183,11 +273,61 @@ async function handleApi(method, pathname, body = {}) {
       const email = String(body.email || '').trim().toLowerCase();
       if (!email) return response(400, { error: 'Applicant email is required for payment.' });
 
+      const eligible = await repository.getEligible(body.applicantId || applicationId);
+      if (!eligible || eligible.status !== 'active') return response(403, { error: 'Applicant is not active on the visa allowlist.' });
+      const userType = normalizeUserType(eligible.userType);
+      const pricing = await repository.getVisaPricing();
       const applicants = parseApplicants(body.applicants);
-      const amount = calculateVisaAmountKobo(applicants);
+      const amount = calculateVisaAmountKobo(applicants, priceForUserType(pricing, userType));
       const currency = 'NGN';
-      const reference = makePaymentReference(applicationId);
+      const reference = userType === 'staff' ? makeStaffReference(applicationId) : makePaymentReference(applicationId);
       const callbackUrl = cleanCallbackUrl(body.callbackUrl);
+      const existing = await repository.getApplication(applicationId);
+      const baseApplication = {
+        id: applicationId,
+        applicantId: body.applicantId || applicationId,
+        name: body.name || eligible.name || (existing && existing.name) || '',
+        email,
+        phone: body.phone || eligible.phone || (existing && existing.phone) || '',
+        applicants: String(applicants),
+        applicantCategory: body.applicantCategory || eligible.category || (existing && existing.applicantCategory) || '',
+        userType,
+        passportExpiry: body.passportExpiry || (existing && existing.passportExpiry) || '',
+        travelDate: body.travelDate || (existing && existing.travelDate) || '',
+        travelHistory: body.travelHistory || (existing && existing.travelHistory) || '',
+        role: body.role || (existing && existing.role) || '',
+        salary: body.salary || (existing && existing.salary) || '',
+        employmentLength: body.employmentLength || (existing && existing.employmentLength) || '',
+        notes: body.notes || (existing && existing.notes) || '',
+        fee: feeLabelFor(userType),
+        status: (existing && existing.status) || 'Draft',
+        passportDetails: body.passportDetails || (existing && existing.passportDetails) || null,
+        reviewedAt: (existing && existing.reviewedAt) || '',
+        createdAt: (existing && existing.createdAt) || undefined
+      };
+
+      if (userType === 'staff') {
+        const application = await repository.upsertApplication({
+          ...baseApplication,
+          paymentStatus: 'Paid',
+          paymentReference: (existing && existing.paymentReference && existing.paymentReference.startsWith('staff-')) ? existing.paymentReference : reference,
+          paymentAmount: 0,
+          paymentCurrency: currency,
+          paymentPaidAt: (existing && existing.paymentPaidAt) || now()
+        });
+        return response(200, {
+          application,
+          payment: {
+            authorizationUrl: '',
+            accessCode: '',
+            reference: application.paymentReference,
+            amount: 0,
+            currency,
+            userType,
+            staff: true
+          }
+        });
+      }
 
       try {
         const initialized = await initializePaystackTransaction({
@@ -200,6 +340,7 @@ async function handleApi(method, pathname, body = {}) {
             applicationId,
             applicantId: body.applicantId || applicationId,
             applicants,
+            userType,
             product: 'Headies x Wakanow Canada Business Visa'
           }
         });
@@ -210,32 +351,9 @@ async function handleApi(method, pathname, body = {}) {
           paymentAmount: amount,
           paymentCurrency: currency
         };
-        const existing = await repository.getApplication(applicationId);
-        // Persist the applicant profile alongside the payment fields so a user
-        // who pays but never completes the final submit still has an
-        // identifiable application. `uploads` is intentionally omitted so
-        // documents saved before payment are preserved.
         const application = await repository.upsertApplication({
-          id: applicationId,
-          applicantId: body.applicantId || applicationId,
-          name: body.name || (existing && existing.name) || '',
-          email,
-          phone: body.phone || (existing && existing.phone) || '',
-          applicants: String(applicants),
-          applicantCategory: body.applicantCategory || (existing && existing.applicantCategory) || '',
-          passportExpiry: body.passportExpiry || (existing && existing.passportExpiry) || '',
-          travelDate: body.travelDate || (existing && existing.travelDate) || '',
-          travelHistory: body.travelHistory || (existing && existing.travelHistory) || '',
-          role: body.role || (existing && existing.role) || '',
-          salary: body.salary || (existing && existing.salary) || '',
-          employmentLength: body.employmentLength || (existing && existing.employmentLength) || '',
-          notes: body.notes || (existing && existing.notes) || '',
-          fee: 'NGN745,000 per applicant package: visa fee included, admin processing fee included, Headies ticket fee included',
-          status: (existing && existing.status) || 'Draft',
-          passportDetails: body.passportDetails || (existing && existing.passportDetails) || null,
-          reviewedAt: (existing && existing.reviewedAt) || '',
+          ...baseApplication,
           paymentPaidAt: (existing && existing.paymentPaidAt) || '',
-          createdAt: (existing && existing.createdAt) || undefined,
           ...paymentFields
         });
 
@@ -246,7 +364,9 @@ async function handleApi(method, pathname, body = {}) {
             accessCode: initialized.data.access_code,
             reference: initialized.data.reference || reference,
             amount,
-            currency
+            currency,
+            userType,
+            staff: false
           }
         });
       } catch (error) {

@@ -25,6 +25,7 @@ create table if not exists visa_eligible_applicants (
   phone text not null default '',
   access_code text not null,
   category text not null default '',
+  user_type text not null default 'basic',
   status text not null default 'active',
   source text not null default 'admin',
   notes text not null default '',
@@ -32,6 +33,7 @@ create table if not exists visa_eligible_applicants (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint visa_eligible_status_check check (status in ('pending', 'active', 'blocked')),
+  constraint visa_eligible_user_type_check check (user_type in ('basic', 'premium', 'staff')),
   constraint visa_eligible_source_check check (source in ('admin', 'signup'))
 );
 
@@ -42,11 +44,16 @@ do $$
 begin
   alter table visa_eligible_applicants
     add column if not exists source text not null default 'admin',
+    add column if not exists user_type text not null default 'basic',
     add column if not exists signup_completed_at timestamptz;
 
   update visa_eligible_applicants
     set source = 'admin'
     where source is null or source = '';
+
+  update visa_eligible_applicants
+    set user_type = 'basic'
+    where user_type is null or user_type = '';
 
   if exists (
     select 1 from pg_constraint
@@ -59,6 +66,18 @@ begin
   alter table visa_eligible_applicants
     add constraint visa_eligible_status_check
     check (status in ('pending', 'active', 'blocked'));
+
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'visa_eligible_user_type_check'
+      and conrelid = 'visa_eligible_applicants'::regclass
+  ) then
+    alter table visa_eligible_applicants drop constraint visa_eligible_user_type_check;
+  end if;
+
+  alter table visa_eligible_applicants
+    add constraint visa_eligible_user_type_check
+    check (user_type in ('basic', 'premium', 'staff'));
 
   if exists (
     select 1 from pg_constraint
@@ -81,6 +100,7 @@ create table if not exists visa_applications (
   phone text not null default '',
   applicants integer not null default 1,
   applicant_category text not null default '',
+  user_type text not null default 'basic',
   passport_expiry date,
   travel_date date,
   travel_history text not null default '',
@@ -88,7 +108,7 @@ create table if not exists visa_applications (
   salary text not null default '',
   employment_length text not null default '',
   notes text not null default '',
-  fee text not null default 'NGN745,000 per applicant package: visa fee included, admin processing fee included, Headies ticket fee included',
+  fee text not null default 'Basic visa package: visa fee included, admin processing fee included, Headies ticket fee included',
   status text not null default 'Draft',
   payment_status text not null default 'Unpaid',
   payment_reference text not null default '',
@@ -115,6 +135,7 @@ create index if not exists visa_applications_applicant_idx
   on visa_applications (applicant_id);
 
 alter table visa_applications
+  add column if not exists user_type text not null default 'basic',
   add column if not exists payment_status text not null default 'Unpaid',
   add column if not exists payment_reference text not null default '',
   add column if not exists payment_amount integer not null default 0,
@@ -122,6 +143,9 @@ alter table visa_applications
   add column if not exists payment_paid_at timestamptz,
   add column if not exists reviewed_at timestamptz,
   add column if not exists passport_details jsonb not null default '{}'::jsonb;
+
+alter table visa_applications
+  alter column fee set default 'Basic visa package: visa fee included, admin processing fee included, Headies ticket fee included';
 
 create unique index if not exists visa_applications_payment_reference_idx
   on visa_applications (payment_reference)
@@ -140,6 +164,22 @@ begin
   alter table visa_applications
     add constraint visa_applications_status_check
     check (status in ('Draft', 'Submitted', 'In review', 'Missing documents', 'Approved', 'Declined'));
+
+  update visa_applications
+    set user_type = 'basic'
+    where user_type is null or user_type = '';
+
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'visa_applications_user_type_check'
+      and conrelid = 'visa_applications'::regclass
+  ) then
+    alter table visa_applications drop constraint visa_applications_user_type_check;
+  end if;
+
+  alter table visa_applications
+    add constraint visa_applications_user_type_check
+    check (user_type in ('basic', 'premium', 'staff'));
 
   if exists (
     select 1 from pg_constraint
@@ -169,3 +209,15 @@ create table if not exists visa_application_documents (
 
 create index if not exists visa_application_documents_application_idx
   on visa_application_documents (application_id);
+
+create table if not exists app_settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+
+insert into app_settings (key, value)
+values
+  ('visa_basic_fee_naira', '745000'),
+  ('visa_premium_fee_naira', '745000')
+on conflict (key) do nothing;

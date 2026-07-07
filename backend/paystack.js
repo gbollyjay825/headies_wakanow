@@ -1,14 +1,15 @@
 const PAYSTACK_BASE_URL = (process.env.PAYSTACK_BASE_URL || 'https://api.paystack.co').replace(/\/+$/, '');
 const VISA_FEE_NAIRA = Number(process.env.VISA_FEE_NAIRA || 745000);
-const VISA_FEE_KOBO = VISA_FEE_NAIRA * 100;
 
 function parseApplicants(value) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
-function calculateVisaAmountKobo(applicants) {
-  return parseApplicants(applicants) * VISA_FEE_KOBO;
+function calculateVisaAmountKobo(applicants, feeNaira = VISA_FEE_NAIRA) {
+  const parsedFee = Number.parseInt(String(feeNaira), 10);
+  const safeFee = Number.isFinite(parsedFee) && parsedFee >= 0 ? parsedFee : VISA_FEE_NAIRA;
+  return parseApplicants(applicants) * safeFee * 100;
 }
 
 function makePaymentReference(applicationId) {

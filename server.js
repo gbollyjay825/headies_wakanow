@@ -111,7 +111,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
-      'access-control-allow-headers': 'content-type'
+      'access-control-allow-headers': 'content-type,x-super-admin-code'
     });
     res.end();
     return;
@@ -120,7 +120,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname.startsWith('/api/')) {
     try {
       const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
-      const result = await handleApi(req.method, url.pathname, body);
+      const result = await handleApi(req.method, url.pathname, body, req);
       if (result && result.data && result.data.__binaryFile) {
         sendBinaryFile(res, result.status, result.data.__binaryFile);
         return;

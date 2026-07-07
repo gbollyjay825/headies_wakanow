@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } from '../api.service';
+import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication, VisaPricing } from '../api.service';
 
 @Component({
   selector: 'app-admin',
@@ -47,6 +47,7 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } fr
                 <p>Preload approved applicant emails, manage login access and review submitted documents.</p>
               </div>
               <div class="admin-title__actions">
+                <span class="badge">{{ isSuperAdmin ? 'Super admin' : 'Admin' }}</span>
                 <button class="btn btn-danger btn-small" type="button" (click)="logout()">Sign out</button>
               </div>
             </div>
@@ -76,7 +77,7 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } fr
               <div class="admin-import-card__copy">
                 <span class="badge">Primary setup</span>
                 <h2>Import allowlist</h2>
-                <p>Upload a CSV of approved applicant emails first. Signup is denied until an email exists in this list. Access code is optional; applicants can create one during signup when admin leaves it blank.</p>
+                <p>Upload a CSV of approved applicant emails first. Columns can include name, email, phone, accessCode, category, userType, status and notes. Blank user type becomes Basic.</p>
               </div>
               <form class="admin-import-card__form" (ngSubmit)="importApplicants(importCsvInput)">
                 <label class="field">
@@ -92,6 +93,23 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } fr
               </div>
             </section>
 
+            <section class="admin-card" [hidden]="activeTab !== 'setup'">
+              <div class="admin-card__head admin-card__head--row">
+                <div>
+                  <h2>Visa pricing</h2>
+                  <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Basic uses the current package price. Premium can be changed by super admin. Staff users pay nothing.</p>
+                </div>
+                <span class="badge">{{ isSuperAdmin ? 'Super admin controls' : 'View only' }}</span>
+              </div>
+              <form class="admin-form-grid" (ngSubmit)="updatePricing()">
+                <label class="field"><span class="form-label">Basic price</span><input name="basicPrice" type="number" min="0" step="1000" [(ngModel)]="pricingModel.basic" [disabled]="!isSuperAdmin"></label>
+                <label class="field"><span class="form-label">Premium price</span><input name="premiumPrice" type="number" min="0" step="1000" [(ngModel)]="pricingModel.premium" [disabled]="!isSuperAdmin"></label>
+                <label class="field"><span class="form-label">Staff price</span><input name="staffPrice" type="text" [value]="money(pricing.staff)" disabled></label>
+                <button class="btn btn-blue btn-block" type="submit" [disabled]="!isSuperAdmin || pricingWorking">{{ pricingWorking ? 'Saving...' : 'Save pricing' }}</button>
+              </form>
+              <p class="form-status" role="status">{{ pricingStatus || (!isSuperAdmin ? 'Login with the super admin passcode to update pricing.' : '') }}</p>
+            </section>
+
             <div class="admin-section-stack">
               <section class="admin-card" [hidden]="activeTab !== 'applications'">
                 <div class="admin-card__head admin-card__head--row">
@@ -103,7 +121,7 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } fr
                   <div class="empty-state" *ngIf="!applications.length">No submitted visa applications yet.</div>
                   <div class="table-wrap" *ngIf="applications.length">
                     <table class="data-table data-table--applications">
-                      <thead><tr><th>Applicant</th><th>Status</th><th>Payment</th><th>Category</th><th>Passport</th><th>Updated</th><th>Documents</th></tr></thead>
+                      <thead><tr><th>Applicant</th><th>Status</th><th>Payment</th><th>Type</th><th>Category</th><th>Passport</th><th>Updated</th><th>Documents</th></tr></thead>
                       <tbody>
                         <tr *ngFor="let app of applications">
                           <td data-label="Applicant"><strong>{{ app.name || app.email }}</strong><div>{{ app.email }} · {{ app.phone }}</div></td>
@@ -125,6 +143,7 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } fr
                               <small *ngIf="app.paymentReference">{{ app.paymentReference }}</small>
                             </div>
                           </td>
+                          <td data-label="Type">{{ app.userType || 'basic' }}</td>
                           <td data-label="Category">{{ app.applicantCategory || 'Unassigned' }}</td>
                           <td data-label="Passport">
                             <div class="passport-admin" *ngIf="app.passportDetails?.parsed; else noPassportDetails">
@@ -167,6 +186,13 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } fr
                       <label class="field"><span class="form-label">Email</span><input name="email" type="email" [(ngModel)]="newApplicant.email" required></label>
                       <label class="field"><span class="form-label">Phone</span><input name="phone" type="tel" [(ngModel)]="newApplicant.phone"></label>
                       <label class="field"><span class="form-label">Access code</span><input name="accessCode" type="password" autocomplete="new-password" [(ngModel)]="newApplicant.accessCode" placeholder="Optional admin-issued code"></label>
+                      <label class="field"><span class="form-label">User type</span>
+                        <select name="userType" [(ngModel)]="newApplicant.userType" [disabled]="!isSuperAdmin">
+                          <option value="basic">Basic</option>
+                          <option value="premium">Premium</option>
+                          <option value="staff">Staff</option>
+                        </select>
+                      </label>
                       <label class="field"><span class="form-label">Category</span>
                         <select name="category" [(ngModel)]="newApplicant.category">
                           <option value="">Unassigned</option>
@@ -177,6 +203,7 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } fr
                       </label>
                     </div>
                     <label class="field"><span class="form-label">Notes</span><textarea name="notes" [(ngModel)]="newApplicant.notes"></textarea></label>
+                    <p class="form-status" *ngIf="!isSuperAdmin">Regular admin can preload Basic users. Premium and Staff require super admin.</p>
                     <button class="btn btn-blue btn-block" type="submit">Preload email</button>
                     <p class="form-status" role="status">{{ addStatus }}</p>
                   </form>
@@ -187,26 +214,34 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } fr
                     <div>
                       <h2>Visa email allowlist</h2>
                       <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Signup is denied unless the applicant email is already preloaded here. Active applicants can sign in after setting or receiving an access code.</p>
+                      <p style="margin:4px 0 0;color:var(--muted);font-size:13px" *ngIf="!isSuperAdmin">Existing allowlist changes are locked to super admin.</p>
                       <p class="form-status" role="status">{{ accessStatus }}</p>
                     </div>
                   </div>
                   <div class="empty-state" *ngIf="!applicants.length">No approved emails have been preloaded yet.</div>
                   <div class="table-wrap" *ngIf="applicants.length">
                     <table class="data-table data-table--allowlist">
-                      <thead><tr><th>Applicant</th><th>Email</th><th>Access code</th><th>Category</th><th>Status</th><th>Signup</th><th>Actions</th></tr></thead>
+                      <thead><tr><th>Applicant</th><th>Email</th><th>Access code</th><th>Type</th><th>Category</th><th>Status</th><th>Signup</th><th>Actions</th></tr></thead>
                       <tbody>
                         <tr *ngFor="let applicant of applicants">
                           <td data-label="Applicant"><strong>{{ applicant.name || 'Unnamed' }}</strong><div>{{ applicant.phone }}</div></td>
                           <td data-label="Email">{{ applicant.email }}</td>
                           <td data-label="Access code">
                             <div class="access-code-cell">
-                              <input class="input" [name]="'accessCode-' + applicant.id" type="password" autocomplete="new-password" [(ngModel)]="applicant.accessCode" minlength="6">
-                              <button class="btn btn-secondary btn-small" type="button" (click)="updateApplicantCode(applicant)">Save code</button>
+                              <input class="input" [name]="'accessCode-' + applicant.id" type="password" autocomplete="new-password" [(ngModel)]="applicant.accessCode" minlength="6" [disabled]="!isSuperAdmin">
+                              <button class="btn btn-secondary btn-small" type="button" [disabled]="!isSuperAdmin" (click)="updateApplicantCode(applicant)">Save code</button>
                             </div>
+                          </td>
+                          <td data-label="Type">
+                            <select [ngModel]="applicant.userType || 'basic'" [disabled]="!isSuperAdmin" (ngModelChange)="updateApplicantUserType(applicant, $event)">
+                              <option value="basic">Basic</option>
+                              <option value="premium">Premium</option>
+                              <option value="staff">Staff</option>
+                            </select>
                           </td>
                           <td data-label="Category">{{ applicant.category || 'Unassigned' }}</td>
                           <td data-label="Status">
-                            <select [ngModel]="applicant.status" (ngModelChange)="updateApplicantStatus(applicant, $event)">
+                            <select [ngModel]="applicant.status" [disabled]="!isSuperAdmin" (ngModelChange)="updateApplicantStatus(applicant, $event)">
                               <option value="pending">pending</option>
                               <option value="active">active</option>
                               <option value="blocked">blocked</option>
@@ -217,7 +252,7 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, VisaApplication } fr
                               {{ applicant.signupCompletedAt ? 'Code set' : 'Awaiting signup' }}
                             </span>
                           </td>
-                          <td data-label="Actions"><button class="btn btn-ghost btn-small" type="button" (click)="removeApplicant(applicant)">Remove</button></td>
+                          <td data-label="Actions"><button class="btn btn-ghost btn-small" type="button" [disabled]="!isSuperAdmin" (click)="removeApplicant(applicant)">Remove</button></td>
                         </tr>
                       </tbody>
                     </table>
@@ -238,10 +273,15 @@ export class AdminComponent implements OnInit {
   importStatus = '';
   accessStatus = '';
   dashboardStatus = '';
+  pricingStatus = '';
   importWorking = false;
-  isAdmin = sessionStorage.getItem('headiesVisaAdminSession') === 'true';
+  pricingWorking = false;
+  adminRole = (sessionStorage.getItem('headiesVisaAdminRole') || '') as '' | 'admin' | 'super';
+  isAdmin = Boolean(this.adminRole);
   applicants: EligibleApplicant[] = [];
   applications: VisaApplication[] = [];
+  pricing: VisaPricing = { basic: 745000, premium: 745000, staff: 0 };
+  pricingModel = { basic: 745000, premium: 745000 };
   importFile: File | null = null;
   selectedImportFileName = '';
   activeTab: 'applications' | 'setup' | 'allowlist' = 'applications';
@@ -252,6 +292,7 @@ export class AdminComponent implements OnInit {
     phone: '',
     accessCode: '',
     category: '',
+    userType: 'basic',
     notes: '',
     status: 'active'
   };
@@ -270,32 +311,51 @@ export class AdminComponent implements OnInit {
     return this.applicants.filter((applicant) => Boolean(applicant.signupCompletedAt)).length;
   }
 
+  get isSuperAdmin(): boolean {
+    return this.adminRole === 'super';
+  }
+
+  get superAdminCode(): string {
+    return sessionStorage.getItem('headiesVisaAdminCode') || '';
+  }
+
   async login(valid: boolean | null): Promise<void> {
     if (!valid) return;
-    if (this.passcode !== 'HEADIES2026') {
+    try {
+      const { role } = await this.api.authorizeAdmin(this.passcode);
+      sessionStorage.setItem('headiesVisaAdminSession', 'true');
+      sessionStorage.setItem('headiesVisaAdminRole', role);
+      sessionStorage.setItem('headiesVisaAdminCode', this.passcode);
+      this.adminRole = role;
+      this.isAdmin = true;
+      this.loginStatus = '';
+      this.passcode = '';
+      await this.loadDashboard();
+    } catch {
       this.loginStatus = 'Invalid admin passcode.';
-      return;
     }
-    sessionStorage.setItem('headiesVisaAdminSession', 'true');
-    this.isAdmin = true;
-    this.loginStatus = '';
-    await this.loadDashboard();
   }
 
   logout(): void {
     sessionStorage.removeItem('headiesVisaAdminSession');
+    sessionStorage.removeItem('headiesVisaAdminRole');
+    sessionStorage.removeItem('headiesVisaAdminCode');
+    this.adminRole = '';
     this.isAdmin = false;
   }
 
   async loadDashboard(): Promise<void> {
     this.dashboardStatus = 'Loading dashboard...';
     try {
-      const [eligible, apps] = await Promise.all([
+      const [eligible, apps, pricing] = await Promise.all([
         this.api.listEligible(),
-        this.api.listApplications()
+        this.api.listApplications(),
+        this.api.getVisaPricing()
       ]);
       this.applicants = eligible.applicants;
       this.applications = apps.applications.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
+      this.pricing = pricing.pricing;
+      this.pricingModel = { basic: pricing.pricing.basic, premium: pricing.pricing.premium };
       this.dashboardStatus = '';
     } catch (error) {
       this.dashboardStatus = error instanceof Error && error.message && error.message !== 'Request failed'
@@ -314,31 +374,52 @@ export class AdminComponent implements OnInit {
       return;
     }
     this.addStatus = 'Preloading approved email...';
-    await this.api.addEligible({ ...this.newApplicant, status: 'active' });
-    this.newApplicant = { name: '', email: '', phone: '', accessCode: '', category: '', notes: '', status: 'active' };
+    await this.api.addEligible({ ...this.newApplicant, status: 'active' }, this.isSuperAdmin ? this.superAdminCode : undefined);
+    this.newApplicant = { name: '', email: '', phone: '', accessCode: '', category: '', userType: 'basic', notes: '', status: 'active' };
     this.addStatus = 'Approved email preloaded.';
     await this.loadDashboard();
   }
 
   async updateApplicantStatus(applicant: EligibleApplicant, status: 'pending' | 'active' | 'blocked'): Promise<void> {
-    await this.api.updateEligible(applicant.id, { status });
+    if (!this.isSuperAdmin) {
+      this.accessStatus = 'Super admin access is required to edit existing allowlist users.';
+      return;
+    }
+    await this.api.updateEligible(applicant.id, { status }, this.superAdminCode);
     await this.loadDashboard();
   }
 
   async updateApplicantCode(applicant: EligibleApplicant): Promise<void> {
+    if (!this.isSuperAdmin) {
+      this.accessStatus = 'Super admin access is required to edit existing allowlist users.';
+      return;
+    }
     const accessCode = String(applicant.accessCode || '').trim();
     if (accessCode.length < 6) {
       this.accessStatus = 'Access code must be at least 6 characters.';
       return;
     }
     this.accessStatus = 'Saving access code...';
-    await this.api.updateEligible(applicant.id, { accessCode });
+    await this.api.updateEligible(applicant.id, { accessCode }, this.superAdminCode);
     this.accessStatus = 'Access code updated.';
     await this.loadDashboard();
   }
 
+  async updateApplicantUserType(applicant: EligibleApplicant, userType: EligibleApplicant['userType']): Promise<void> {
+    if (!this.isSuperAdmin) {
+      this.accessStatus = 'Super admin access is required to edit existing allowlist users.';
+      return;
+    }
+    await this.api.updateEligible(applicant.id, { userType }, this.superAdminCode);
+    await this.loadDashboard();
+  }
+
   async removeApplicant(applicant: EligibleApplicant): Promise<void> {
-    await this.api.deleteEligible(applicant.id);
+    if (!this.isSuperAdmin) {
+      this.accessStatus = 'Super admin access is required to remove allowlist users.';
+      return;
+    }
+    await this.api.deleteEligible(applicant.id, this.superAdminCode);
     await this.loadDashboard();
   }
 
@@ -353,6 +434,27 @@ export class AdminComponent implements OnInit {
       this.dashboardStatus = error instanceof Error && error.message && error.message !== 'Request failed'
         ? `Could not update the status: ${error.message}`
         : 'Could not update the application status. Try again.';
+    }
+  }
+
+  async updatePricing(): Promise<void> {
+    if (!this.isSuperAdmin) {
+      this.pricingStatus = 'Super admin access is required to update visa pricing.';
+      return;
+    }
+    this.pricingWorking = true;
+    this.pricingStatus = 'Saving visa pricing...';
+    try {
+      const { pricing } = await this.api.updateVisaPricing(this.pricingModel, this.superAdminCode);
+      this.pricing = pricing;
+      this.pricingModel = { basic: pricing.basic, premium: pricing.premium };
+      this.pricingStatus = 'Visa pricing updated.';
+    } catch (error) {
+      this.pricingStatus = error instanceof Error && error.message && error.message !== 'Request failed'
+        ? error.message
+        : 'Could not update visa pricing.';
+    } finally {
+      this.pricingWorking = false;
     }
   }
 
@@ -386,11 +488,12 @@ export class AdminComponent implements OnInit {
         phone: row['phone'] || row['Phone'] || '',
         accessCode: row['accessCode'] || row['AccessCode'] || row['code'] || row['Code'] || '',
         category: row['category'] || row['Category'] || '',
+        userType: (row['userType'] || row['UserType'] || row['type'] || row['Type'] || '') as EligibleApplicant['userType'],
         status: (row['status'] || row['Status'] || 'active') as EligibleApplicant['status'],
         notes: row['notes'] || row['Notes'] || ''
       }));
       this.importStatus = 'Importing approved emails...';
-      await this.api.importEligible(records);
+      await this.api.importEligible(records, this.isSuperAdmin ? this.superAdminCode : undefined);
       this.importStatus = `${records.length} approved email${records.length === 1 ? '' : 's'} imported.`;
       this.importFile = null;
       this.selectedImportFileName = '';
@@ -445,12 +548,12 @@ export class AdminComponent implements OnInit {
   }
 
   downloadTemplate(): void {
-    this.downloadText('visa-email-allowlist-template.csv', 'name,email,phone,accessCode,category,status,notes\nExample Applicant,applicant@example.com,+2340000000000,,employed,active,Preloaded by admin');
+    this.downloadText('visa-email-allowlist-template.csv', 'name,email,phone,accessCode,category,userType,status,notes\nExample Applicant,applicant@example.com,+2340000000000,,employed,basic,active,Preloaded by admin');
   }
 
   exportEligibleCSV(): void {
-    const rows = [['name', 'email', 'phone', 'accessCode', 'category', 'status', 'signupCompletedAt', 'notes']];
-    this.applicants.forEach((item) => rows.push([item.name, item.email, item.phone, item.accessCode || '', item.category, item.status, item.signupCompletedAt || '', item.notes]));
+    const rows = [['name', 'email', 'phone', 'accessCode', 'category', 'userType', 'status', 'signupCompletedAt', 'notes']];
+    this.applicants.forEach((item) => rows.push([item.name, item.email, item.phone, item.accessCode || '', item.category, item.userType || 'basic', item.status, item.signupCompletedAt || '', item.notes]));
     this.downloadText('headies-visa-eligible-applicants.csv', rows.map((row) => row.map(this.csvEscape).join(',')).join('\n'));
   }
 
@@ -486,6 +589,10 @@ export class AdminComponent implements OnInit {
     const parsed = app.passportDetails?.parsed;
     const parts = [parsed?.firstName, parsed?.middleName, parsed?.surname].filter(Boolean);
     return parts.length ? parts.join(' ') : 'Name not found';
+  }
+
+  money(value: number): string {
+    return `NGN ${Number(value || 0).toLocaleString()}`;
   }
 
   formatDate(value?: string): string {

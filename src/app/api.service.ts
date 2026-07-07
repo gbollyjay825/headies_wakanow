@@ -23,6 +23,7 @@ export interface EligibleApplicant {
   phone: string;
   accessCode?: string;
   category: string;
+  userType?: 'basic' | 'premium' | 'staff';
   status: 'pending' | 'active' | 'blocked';
   source?: 'admin' | 'signup';
   notes: string;
@@ -78,6 +79,7 @@ export interface VisaApplication {
   phone: string;
   applicants: string;
   applicantCategory: string;
+  userType?: 'basic' | 'premium' | 'staff';
   passportExpiry: string;
   travelDate: string;
   travelHistory: string;
@@ -106,10 +108,22 @@ export interface PaystackPaymentInit {
   reference: string;
   amount: number;
   currency: string;
+  userType?: 'basic' | 'premium' | 'staff';
+  staff?: boolean;
+}
+
+export interface VisaPricing {
+  basic: number;
+  premium: number;
+  staff: number;
 }
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
+  private superHeaders(superAdminCode?: string): Record<string, string> {
+    return superAdminCode ? { 'x-super-admin-code': superAdminCode } : {};
+  }
+
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(path, {
       ...init,
@@ -137,6 +151,25 @@ export class ApiService {
     return this.request('/api/eligible');
   }
 
+  authorizeAdmin(passcode: string): Promise<{ role: 'admin' | 'super'; superAdmin: boolean }> {
+    return this.request('/api/admin/authorize', {
+      method: 'POST',
+      body: JSON.stringify({ passcode })
+    });
+  }
+
+  getVisaPricing(): Promise<{ pricing: VisaPricing }> {
+    return this.request('/api/visa/pricing');
+  }
+
+  updateVisaPricing(pricing: Partial<VisaPricing>, superAdminCode: string): Promise<{ pricing: VisaPricing }> {
+    return this.request('/api/visa/pricing', {
+      method: 'PATCH',
+      headers: this.superHeaders(superAdminCode),
+      body: JSON.stringify({ pricing })
+    });
+  }
+
   signupApplicant(record: Partial<EligibleApplicant>): Promise<{ applicant: EligibleApplicant }> {
     return this.request('/api/eligible/signup', {
       method: 'POST',
@@ -151,30 +184,34 @@ export class ApiService {
     });
   }
 
-  addEligible(record: Partial<EligibleApplicant>): Promise<{ applicants: EligibleApplicant[] }> {
+  addEligible(record: Partial<EligibleApplicant>, superAdminCode?: string): Promise<{ applicants: EligibleApplicant[] }> {
     return this.request('/api/eligible', {
       method: 'POST',
+      headers: this.superHeaders(superAdminCode),
       body: JSON.stringify(record)
     });
   }
 
-  importEligible(records: Partial<EligibleApplicant>[]): Promise<{ count: number; applicants: EligibleApplicant[] }> {
+  importEligible(records: Partial<EligibleApplicant>[], superAdminCode?: string): Promise<{ count: number; applicants: EligibleApplicant[] }> {
     return this.request('/api/eligible/import', {
       method: 'POST',
+      headers: this.superHeaders(superAdminCode),
       body: JSON.stringify({ records })
     });
   }
 
-  updateEligible(id: string, fields: Partial<EligibleApplicant>): Promise<{ applicant: EligibleApplicant }> {
+  updateEligible(id: string, fields: Partial<EligibleApplicant>, superAdminCode?: string): Promise<{ applicant: EligibleApplicant }> {
     return this.request(`/api/eligible/${encodeURIComponent(id)}`, {
       method: 'PATCH',
+      headers: this.superHeaders(superAdminCode),
       body: JSON.stringify(fields)
     });
   }
 
-  deleteEligible(id: string): Promise<{ ok: boolean }> {
+  deleteEligible(id: string, superAdminCode?: string): Promise<{ ok: boolean }> {
     return this.request(`/api/eligible/${encodeURIComponent(id)}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: this.superHeaders(superAdminCode)
     });
   }
 

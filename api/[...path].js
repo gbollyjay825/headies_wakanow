@@ -32,7 +32,7 @@ module.exports = async function handler(req, res) {
   try {
     const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
     const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
-    const result = await handleApi(req.method, url.pathname, body);
+    const result = await handleApi(req.method, url.pathname, body, req);
     if (result && result.data && result.data.__binaryFile) {
       const file = result.data.__binaryFile;
       // ASCII-only fallback: Node rejects header values with code units > 0xFF.

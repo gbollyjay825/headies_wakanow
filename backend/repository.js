@@ -30,9 +30,41 @@ function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+const USER_TYPES = new Set(['basic', 'premium', 'staff']);
+const VISA_PRICE_KEYS = {
+  basic: 'visa_basic_fee_naira',
+  premium: 'visa_premium_fee_naira'
+};
+const DEFAULT_VISA_PRICING = {
+  basic: Number(process.env.VISA_FEE_NAIRA || 745000),
+  premium: Number(process.env.VISA_PREMIUM_FEE_NAIRA || process.env.VISA_FEE_NAIRA || 745000)
+};
+
+function normalizeUserType(value) {
+  const type = String(value || '').trim().toLowerCase();
+  return USER_TYPES.has(type) ? type : 'basic';
+}
+
+function recordUserType(record, fallback = 'basic') {
+  return normalizeUserType(
+    record.userType || record.UserType || record.user_type || record.type || record.Type || record.visaType || record.VisaType || fallback
+  );
+}
+
+function parsePrice(value, fallback) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 function preloadedEmailRequiredError() {
   const error = new Error('This email is not on the approved visa access list. Ask the admin team to preload it before signing up.');
   error.code = 'EMAIL_NOT_PRELOADED';
+  error.status = 403;
+  return error;
+}
+
+function forbiddenError(message) {
+  const error = new Error(message);
   error.status = 403;
   return error;
 }
@@ -66,6 +98,7 @@ function toEligible(row) {
     phone: row.phone,
     accessCode: row.access_code,
     category: row.category,
+    userType: normalizeUserType(row.user_type),
     status: row.status,
     source: row.source || 'admin',
     notes: row.notes,
@@ -84,6 +117,7 @@ function toApplication(row) {
     phone: row.phone,
     applicants: String(row.applicants || 1),
     applicantCategory: row.applicant_category,
+    userType: normalizeUserType(row.user_type),
     passportExpiry: row.passport_expiry ? String(row.passport_expiry).slice(0, 10) : '',
     travelDate: row.travel_date ? String(row.travel_date).slice(0, 10) : '',
     travelHistory: row.travel_history,
@@ -217,21 +251,32 @@ async function listEligiblePg() {
   return result.rows.map(toEligible);
 }
 
-async function upsertEligibleRecordsPg(records) {
+async function upsertEligibleRecordsPg(records, options = {}) {
+  const allowExistingUpdates = Boolean(options.allowExistingUpdates);
+  const allowPrivilegedUserTypes = Boolean(options.allowPrivilegedUserTypes);
   for (const record of records) {
     const email = normalizeEmail(record.email || record.Email);
     if (!email) continue;
+    const existingResult = await pool.query('select id from visa_eligible_applicants where email = $1 limit 1', [email]);
+    if (existingResult.rows[0] && !allowExistingUpdates) {
+      throw forbiddenError('Super admin access is required to edit an existing allowlist applicant.');
+    }
+    const userType = recordUserType(record);
+    if (userType !== 'basic' && !allowPrivilegedUserTypes) {
+      throw forbiddenError('Super admin access is required to create premium or staff visa users.');
+    }
     const explicitAccessCode = String(record.accessCode || record.AccessCode || record.code || record.Code || '').trim();
     const accessCode = explicitAccessCode || makeAccessCode();
     await pool.query(
       `insert into visa_eligible_applicants
-        (id, name, email, phone, access_code, category, status, source, notes, signup_completed_at, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, 'admin', $8, $9::timestamptz, now(), now())
+        (id, name, email, phone, access_code, category, user_type, status, source, notes, signup_completed_at, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, 'admin', $9, $10::timestamptz, now(), now())
        on conflict (email) do update set
         name = coalesce(nullif(excluded.name, ''), visa_eligible_applicants.name),
         phone = coalesce(nullif(excluded.phone, ''), visa_eligible_applicants.phone),
         access_code = coalesce(nullif(excluded.access_code, ''), visa_eligible_applicants.access_code),
         category = coalesce(nullif(excluded.category, ''), visa_eligible_applicants.category),
+        user_type = excluded.user_type,
         status = coalesce(nullif(excluded.status, ''), visa_eligible_applicants.status),
         source = 'admin',
         notes = coalesce(nullif(excluded.notes, ''), visa_eligible_applicants.notes),
@@ -244,6 +289,7 @@ async function upsertEligibleRecordsPg(records) {
         String(record.phone || record.Phone || ''),
         accessCode,
         String(record.category || record.Category || ''),
+        userType,
         String(record.status || record.Status || 'active'),
         String(record.notes || record.Notes || ''),
         explicitAccessCode ? now() : null
@@ -301,6 +347,11 @@ async function findEligibleLoginPg(email, accessCode) {
   return result.rows[0] ? toEligible(result.rows[0]) : null;
 }
 
+async function getEligiblePg(id) {
+  const result = await pool.query('select * from visa_eligible_applicants where id = $1 or email = $1 limit 1', [String(id || '').trim()]);
+  return result.rows[0] ? toEligible(result.rows[0]) : null;
+}
+
 async function updateEligiblePg(id, fields) {
   const result = await pool.query(
     `update visa_eligible_applicants
@@ -308,8 +359,9 @@ async function updateEligiblePg(id, fields) {
          phone = coalesce($3, phone),
          access_code = coalesce($4, access_code),
          category = coalesce($5, category),
-         status = coalesce($6, status),
-         notes = coalesce($7, notes),
+         user_type = coalesce($6, user_type),
+         status = coalesce($7, status),
+         notes = coalesce($8, notes),
          signup_completed_at = case when $4 is null then signup_completed_at else coalesce(signup_completed_at, now()) end,
          updated_at = now()
      where id = $1
@@ -320,6 +372,7 @@ async function updateEligiblePg(id, fields) {
       fields.phone == null ? null : String(fields.phone),
       fields.accessCode == null ? null : String(fields.accessCode),
       fields.category == null ? null : String(fields.category),
+      fields.userType == null ? null : normalizeUserType(fields.userType),
       fields.status == null ? null : String(fields.status),
       fields.notes == null ? null : String(fields.notes)
     ]
@@ -330,6 +383,31 @@ async function updateEligiblePg(id, fields) {
 async function deleteEligiblePg(id) {
   const result = await pool.query('delete from visa_eligible_applicants where id = $1', [id]);
   return result.rowCount > 0;
+}
+
+async function getVisaPricingPg() {
+  const result = await pool.query('select key, value from app_settings where key = any($1::text[])', [Object.values(VISA_PRICE_KEYS)]);
+  const values = new Map(result.rows.map((row) => [row.key, row.value]));
+  return {
+    basic: parsePrice(values.get(VISA_PRICE_KEYS.basic), DEFAULT_VISA_PRICING.basic),
+    premium: parsePrice(values.get(VISA_PRICE_KEYS.premium), DEFAULT_VISA_PRICING.premium),
+    staff: 0
+  };
+}
+
+async function updateVisaPricingPg(fields) {
+  const current = await getVisaPricingPg();
+  const next = {
+    basic: parsePrice(fields.basic, current.basic),
+    premium: parsePrice(fields.premium, current.premium)
+  };
+  await pool.query(
+    `insert into app_settings (key, value, updated_at)
+     values ($1, $2, now()), ($3, $4, now())
+     on conflict (key) do update set value = excluded.value, updated_at = now()`,
+    [VISA_PRICE_KEYS.basic, String(next.basic), VISA_PRICE_KEYS.premium, String(next.premium)]
+  );
+  return getVisaPricingPg();
 }
 
 async function selectApplicationsPg(whereSql, params) {
@@ -369,15 +447,21 @@ async function upsertApplicationPg(app) {
   try {
     await client.query('begin');
     const id = app.id || app.applicantId || makeId('visa');
-    const applicantId = await applicantExists(client, app.applicantId || id) ? (app.applicantId || id) : null;
+    const eligibleResult = await client.query(
+      'select id, user_type from visa_eligible_applicants where id = $1 limit 1',
+      [app.applicantId || id]
+    );
+    const eligibleApplicant = eligibleResult.rows[0] || null;
+    const applicantId = eligibleApplicant ? eligibleApplicant.id : null;
+    const userType = normalizeUserType((eligibleApplicant && eligibleApplicant.user_type) || app.userType);
     const result = await client.query(
       `insert into visa_applications
-        (id, applicant_id, name, email, phone, applicants, applicant_category, passport_expiry, travel_date,
+        (id, applicant_id, name, email, phone, applicants, applicant_category, user_type, passport_expiry, travel_date,
          travel_history, role, salary, employment_length, notes, fee, status, payment_status, payment_reference,
          payment_amount, payment_currency, payment_paid_at, reviewed_at, passport_details, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, nullif($8, '')::date, nullif($9, '')::date,
-         $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, nullif($21, '')::timestamptz,
-         nullif($22, '')::timestamptz, $23::jsonb, coalesce($24::timestamptz, now()), now())
+       values ($1, $2, $3, $4, $5, $6, $7, $8, nullif($9, '')::date, nullif($10, '')::date,
+         $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, nullif($22, '')::timestamptz,
+         nullif($23, '')::timestamptz, $24::jsonb, coalesce($25::timestamptz, now()), now())
        on conflict (id) do update set
          applicant_id = excluded.applicant_id,
          name = excluded.name,
@@ -385,6 +469,7 @@ async function upsertApplicationPg(app) {
          phone = excluded.phone,
          applicants = excluded.applicants,
          applicant_category = excluded.applicant_category,
+         user_type = excluded.user_type,
          passport_expiry = excluded.passport_expiry,
          travel_date = excluded.travel_date,
          travel_history = excluded.travel_history,
@@ -411,6 +496,7 @@ async function upsertApplicationPg(app) {
         String(app.phone || ''),
         parsePositiveInt(app.applicants, 1),
         String(app.applicantCategory || ''),
+        userType,
         String(app.passportExpiry || ''),
         String(app.travelDate || ''),
         String(app.travelHistory || ''),
@@ -418,7 +504,7 @@ async function upsertApplicationPg(app) {
         String(app.salary || ''),
         String(app.employmentLength || ''),
         String(app.notes || ''),
-        String(app.fee || 'NGN745,000 per applicant package: visa fee included, admin processing fee included, Headies ticket fee included'),
+        String(app.fee || 'Basic visa package: visa fee included, admin processing fee included, Headies ticket fee included'),
         String(app.status || 'Draft'),
         String(app.paymentStatus || 'Unpaid'),
         String(app.paymentReference || ''),
@@ -521,13 +607,13 @@ async function ensureApplicationRowPg(client, applicationId) {
   );
   if (found.rows[0]) return found.rows[0].id;
   const eligibleResult = await client.query(
-    'select id, name, email, phone, category from visa_eligible_applicants where id = $1 limit 1',
+    'select id, name, email, phone, category, user_type from visa_eligible_applicants where id = $1 limit 1',
     [applicationId]
   );
   const applicant = eligibleResult.rows[0] || null;
   await client.query(
-    `insert into visa_applications (id, applicant_id, name, email, phone, applicant_category, status, created_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, 'Draft', now(), now())
+    `insert into visa_applications (id, applicant_id, name, email, phone, applicant_category, user_type, status, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, 'Draft', now(), now())
      on conflict (id) do nothing`,
     [
       applicationId,
@@ -535,7 +621,8 @@ async function ensureApplicationRowPg(client, applicationId) {
       applicant ? applicant.name : '',
       applicant ? applicant.email : '',
       applicant ? applicant.phone : '',
-      applicant ? applicant.category : ''
+      applicant ? applicant.category : '',
+      normalizeUserType(applicant && applicant.user_type)
     ]
   );
   return applicationId;
@@ -635,16 +722,22 @@ async function listEligibleJson() {
   return jsonStore().eligibleApplicants.map((item) => ({
     source: 'admin',
     signupCompletedAt: '',
-    ...item
+    ...item,
+    userType: normalizeUserType(item.userType)
   }));
 }
 
-async function upsertEligibleRecordsJson(records) {
+async function upsertEligibleRecordsJson(records, options = {}) {
+  const allowExistingUpdates = Boolean(options.allowExistingUpdates);
+  const allowPrivilegedUserTypes = Boolean(options.allowPrivilegedUserTypes);
   const store = jsonStore();
   records.forEach((record) => {
     const email = normalizeEmail(record.email || record.Email);
     if (!email) return;
     const existing = store.eligibleApplicants.find((item) => normalizeEmail(item.email) === email);
+    if (existing && !allowExistingUpdates) throw forbiddenError('Super admin access is required to edit an existing allowlist applicant.');
+    const userType = recordUserType(record, existing && existing.userType);
+    if (userType !== 'basic' && !allowPrivilegedUserTypes) throw forbiddenError('Super admin access is required to create premium or staff visa users.');
     const explicitAccessCode = String(record.accessCode || record.AccessCode || record.code || record.Code || '').trim();
     const next = {
       id: existing ? existing.id : makeId('elig'),
@@ -653,6 +746,7 @@ async function upsertEligibleRecordsJson(records) {
       phone: String(record.phone || record.Phone || (existing && existing.phone) || '').trim(),
       accessCode: String(explicitAccessCode || (existing && existing.accessCode) || makeAccessCode()).trim(),
       category: String(record.category || record.Category || (existing && existing.category) || '').trim(),
+      userType,
       status: String(record.status || record.Status || (existing && existing.status) || 'active').trim() || 'active',
       source: 'admin',
       notes: String(record.notes || record.Notes || (existing && existing.notes) || '').trim(),
@@ -675,7 +769,7 @@ async function signupApplicantJson(record) {
   const store = jsonStore();
   const existing = store.eligibleApplicants.find((item) => normalizeEmail(item.email) === email);
   if (!existing) throw preloadedEmailRequiredError();
-  if (existing.status === 'blocked') return existing;
+  if (existing.status === 'blocked') return { ...existing, userType: normalizeUserType(existing.userType) };
   const preserveExistingCode = Boolean(existing.signupCompletedAt);
   const next = {
     id: existing.id,
@@ -684,6 +778,7 @@ async function signupApplicantJson(record) {
     phone: String(record.phone || (existing && existing.phone) || '').trim(),
     accessCode: preserveExistingCode ? existing.accessCode : accessCode,
     category: String(record.category || (existing && existing.category) || '').trim(),
+    userType: normalizeUserType(existing.userType),
     status: existing.status || 'active',
     source: 'admin',
     notes: String(record.notes || (existing && existing.notes) || '').trim(),
@@ -697,11 +792,17 @@ async function signupApplicantJson(record) {
 }
 
 async function findEligibleLoginJson(email, accessCode) {
-  return jsonStore().eligibleApplicants.find((item) => (
-    normalizeEmail(item.email) === normalizeEmail(email) &&
-    String(item.accessCode || '').trim().toLowerCase() === String(accessCode || '').trim().toLowerCase() &&
-    (item.status || 'active') === 'active'
+  const item = jsonStore().eligibleApplicants.find((record) => (
+    normalizeEmail(record.email) === normalizeEmail(email) &&
+    String(record.accessCode || '').trim().toLowerCase() === String(accessCode || '').trim().toLowerCase() &&
+    (record.status || 'active') === 'active'
   )) || null;
+  return item ? { ...item, userType: normalizeUserType(item.userType) } : null;
+}
+
+async function getEligibleJson(id) {
+  const item = jsonStore().eligibleApplicants.find((record) => record.id === id || normalizeEmail(record.email) === normalizeEmail(id));
+  return item ? { ...item, userType: normalizeUserType(item.userType) } : null;
 }
 
 async function updateEligibleJson(id, fields) {
@@ -709,6 +810,7 @@ async function updateEligibleJson(id, fields) {
   const item = store.eligibleApplicants.find((record) => record.id === id);
   if (!item) return null;
   Object.assign(item, fields, { updatedAt: now() });
+  if (fields.userType != null) item.userType = normalizeUserType(fields.userType);
   if (fields.accessCode != null && !item.signupCompletedAt) item.signupCompletedAt = now();
   writeStore(store);
   return item;
@@ -720,6 +822,27 @@ async function deleteEligibleJson(id) {
   store.eligibleApplicants = store.eligibleApplicants.filter((item) => item.id !== id);
   writeStore(store);
   return store.eligibleApplicants.length < before;
+}
+
+async function getVisaPricingJson() {
+  const store = jsonStore();
+  const pricing = store.visaPricing || {};
+  return {
+    basic: parsePrice(pricing.basic, DEFAULT_VISA_PRICING.basic),
+    premium: parsePrice(pricing.premium, DEFAULT_VISA_PRICING.premium),
+    staff: 0
+  };
+}
+
+async function updateVisaPricingJson(fields) {
+  const store = jsonStore();
+  const current = await getVisaPricingJson();
+  store.visaPricing = {
+    basic: parsePrice(fields.basic, current.basic),
+    premium: parsePrice(fields.premium, current.premium)
+  };
+  writeStore(store);
+  return getVisaPricingJson();
 }
 
 function ensureStoredDocumentIds(store) {
@@ -806,10 +929,12 @@ async function upsertApplicationJson(app) {
   const store = jsonStore();
   const id = app.id || app.applicantId || makeId('visa');
   const existing = store.visaApplications.find((item) => item.id === id || item.applicantId === id);
+  const applicant = store.eligibleApplicants.find((item) => item.id === (app.applicantId || id)) || null;
   const application = {
     ...app,
     id,
     applicantId: app.applicantId || id,
+    userType: normalizeUserType((applicant && applicant.userType) || app.userType || (existing && existing.userType)),
     status: app.status || (existing && existing.status) || 'Draft',
     paymentStatus: app.paymentStatus || (existing && existing.paymentStatus) || 'Unpaid',
     paymentReference: app.paymentReference || (existing && existing.paymentReference) || '',
@@ -859,6 +984,7 @@ async function setApplicationDocumentJson(applicationId, payload) {
       email: (applicant && applicant.email) || '',
       phone: (applicant && applicant.phone) || '',
       applicantCategory: (applicant && applicant.category) || '',
+      userType: normalizeUserType(applicant && applicant.userType),
       status: 'Draft',
       paymentStatus: 'Unpaid',
       uploads: [],
@@ -920,9 +1046,12 @@ const postgresRepository = {
   listEligible: listEligiblePg,
   upsertEligibleRecords: upsertEligibleRecordsPg,
   signupApplicant: signupApplicantPg,
+  getEligible: getEligiblePg,
   findEligibleLogin: findEligibleLoginPg,
   updateEligible: updateEligiblePg,
   deleteEligible: deleteEligiblePg,
+  getVisaPricing: getVisaPricingPg,
+  updateVisaPricing: updateVisaPricingPg,
   listApplications: listApplicationsPg,
   getApplication: getApplicationPg,
   getApplicationByPaymentReference: getApplicationByPaymentReferencePg,
@@ -941,9 +1070,12 @@ const jsonRepository = {
   listEligible: listEligibleJson,
   upsertEligibleRecords: upsertEligibleRecordsJson,
   signupApplicant: signupApplicantJson,
+  getEligible: getEligibleJson,
   findEligibleLogin: findEligibleLoginJson,
   updateEligible: updateEligibleJson,
   deleteEligible: deleteEligibleJson,
+  getVisaPricing: getVisaPricingJson,
+  updateVisaPricing: updateVisaPricingJson,
   listApplications: listApplicationsJson,
   getApplication: getApplicationJson,
   getApplicationByPaymentReference: getApplicationByPaymentReferenceJson,

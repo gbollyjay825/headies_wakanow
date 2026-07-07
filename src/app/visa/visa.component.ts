@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, EligibleApplicant, PassportParseResult, UploadGroup, UploadedFileRecord, VisaApplication } from '../api.service';
+import { ApiService, EligibleApplicant, PassportParseResult, UploadGroup, UploadedFileRecord, VisaApplication, VisaPricing } from '../api.service';
 
 type UploadFile = File | UploadedFileRecord;
 
@@ -83,7 +83,7 @@ interface UploadDoc {
                 <div class="requirements-card__intro">
                   <p class="section-kicker">Canada Business Visa</p>
                   <h2 class="section-title" style="font-size:26px">Requirements and application guide</h2>
-                  <p style="margin:8px 0 18px;color:var(--muted)">Total payable package <strong style="color:var(--text)">NGN 745,000</strong> per applicant. Prepare these documents before uploading.</p>
+                  <p style="margin:8px 0 18px;color:var(--muted)">Basic package is <strong style="color:var(--text)">{{ basicPriceLabel }}</strong> per applicant. Premium or staff handling is applied from the approved allowlist profile after sign in.</p>
                   <ul class="fee-breakdown fee-breakdown--compact" aria-label="Visa package breakdown">
                     <li><span>Visa fee</span><strong>Included</strong></li>
                     <li><span>Admin processing fee</span><strong>Included</strong></li>
@@ -154,6 +154,7 @@ interface UploadDoc {
               </div>
               <div class="status-pills">
                 <span class="pill pill--warn" *ngIf="existingApplication">{{ existingApplication.status }}</span>
+                <span class="pill pill--muted">{{ applicantUserTypeLabel }}</span>
                 <span class="pill" [class.pill--ok]="paymentPaid" [class.pill--warn]="paymentPending || paymentFailed">{{ paymentStatusLabel }}</span>
                 <span class="pill pill--muted">{{ fileCount }} files</span>
               </div>
@@ -163,7 +164,7 @@ interface UploadDoc {
             <div class="portal-stepper" aria-label="Visa application stages">
               <div class="portal-step is-active"><b>1</b><div><span>Passport</span><small>Extract details</small></div></div>
               <div class="portal-step"><b>2</b><div><span>Documents</span><small>Upload files</small></div></div>
-              <div class="portal-step" [class.is-active]="paymentPaid"><b>3</b><div><span>Payment</span><small>{{ paymentPaid ? 'Paid' : 'Required before submit' }}</small></div></div>
+              <div class="portal-step" [class.is-active]="paymentPaid"><b>3</b><div><span>Payment</span><small>{{ isStaffApplicant ? 'Staff recorded' : paymentPaid ? 'Paid' : 'Required before submit' }}</small></div></div>
               <div class="portal-step" [class.is-active]="reviewConfirmed"><b>4</b><div><span>Review</span><small>Confirm before submit</small></div></div>
             </div>
 
@@ -172,19 +173,19 @@ interface UploadDoc {
                 <section class="portal-card payment-card" [class.is-paid]="paymentPaid">
                   <div class="payment-card__copy">
                     <p class="section-kicker">Payment step</p>
-                    <h2>{{ paymentPaid ? 'Payment verified' : 'Choose how to continue' }}</h2>
-                    <p>{{ paymentPaid ? 'Payment has been verified. Continue with the applicant documents and final review.' : 'Pay securely by card now, or continue to the document checklist and pay before final submission.' }}</p>
+                    <h2>{{ isStaffApplicant ? 'Staff visa access' : paymentPaid ? 'Payment verified' : 'Choose how to continue' }}</h2>
+                    <p>{{ isStaffApplicant ? 'This staff profile does not require card payment. A staff transaction is recorded for audit before submission.' : paymentPaid ? 'Payment has been verified. Continue with the applicant documents and final review.' : 'Pay securely by card now, or continue to the document checklist and pay before final submission.' }}</p>
                     <div class="payment-card__meta">
                       <span class="pill" [class.pill--ok]="paymentPaid" [class.pill--warn]="paymentPending || paymentFailed">{{ paymentStatusLabel }}</span>
                       <small *ngIf="application.paymentReference">Reference {{ application.paymentReference }}</small>
-                      <small *ngIf="!application.paymentReference">Secured through Paystack card checkout</small>
+                      <small *ngIf="!application.paymentReference">{{ isStaffApplicant ? 'Staff account, no card payment' : 'Secured through Paystack card checkout' }}</small>
                     </div>
                   </div>
                   <div class="payment-card__due">
                     <div class="payment-card__total">
                       <span>Total due</span>
                       <strong>{{ totalDueLabel }}</strong>
-                      <small>{{ application.applicants || 1 }} applicant(s) · package total per applicant</small>
+                      <small>{{ isStaffApplicant ? 'Staff applicant · no card payment' : (application.applicants || 1) + ' applicant(s) · ' + applicantUserTypeLabel + ' package' }}</small>
                     </div>
                     <ul class="fee-breakdown" aria-label="Payment breakdown">
                       <li><span>Visa fee</span><strong>Included</strong></li>
@@ -192,13 +193,16 @@ interface UploadDoc {
                       <li><span>Headies ticket fee</span><strong>Included</strong></li>
                     </ul>
                     <div class="payment-card__actions">
-                      <button class="btn btn-blue btn-block" type="button" [disabled]="paymentWorking || paymentPaid" (click)="startPaystackPayment()">
+                      <button class="btn btn-blue btn-block" type="button" *ngIf="!isStaffApplicant" [disabled]="paymentWorking || paymentPaid" (click)="startPaystackPayment()">
                         {{ paymentPaid ? 'Payment verified' : paymentWorking ? 'Opening Paystack...' : 'Pay now with card' }}
+                      </button>
+                      <button class="btn btn-blue btn-block" type="button" *ngIf="isStaffApplicant" [disabled]="paymentWorking || paymentPaid" (click)="recordStaffPayment()">
+                        {{ paymentPaid ? 'Staff access recorded' : paymentWorking ? 'Recording...' : 'Record staff access' }}
                       </button>
                       <button class="btn btn-secondary btn-block" type="button" *ngIf="!paymentPaid && !uploadSectionVisible" (click)="openUploadsBeforePayment()">Continue to uploads</button>
                     </div>
                     <p class="payment-card__hint" *ngIf="!paymentPaid">
-                      {{ uploadSectionVisible ? 'Uploads are open. Payment is still required before you can submit.' : 'You can upload first, but submission stays locked until Paystack verifies payment.' }}
+                      {{ isStaffApplicant ? 'Staff submission unlocks once the staff transaction is recorded.' : uploadSectionVisible ? 'Uploads are open. Payment is still required before you can submit.' : 'You can upload first, but submission stays locked until Paystack verifies payment.' }}
                     </p>
                     <p class="form-status" role="status">{{ paymentStatus }}</p>
                   </div>
@@ -209,7 +213,7 @@ interface UploadDoc {
                     <div>
                       <h2>Upload documents</h2>
                       <p>Signed in as <strong>{{ currentApplicant?.name || currentApplicant?.email }}</strong></p>
-                      <span>{{ currentApplicant?.email }} · {{ currentApplicant?.category }}</span>
+                      <span>{{ currentApplicant?.email }} · {{ currentApplicant?.category }} · {{ applicantUserTypeLabel }}</span>
                     </div>
                     <span class="badge">Portal save ready</span>
                   </div>
@@ -298,7 +302,7 @@ interface UploadDoc {
                 <div class="progress-panel__head">
                   <span class="badge">Progress</span>
                   <h3>Application status</h3>
-                  <p>{{ paymentPaid ? 'Payment is verified. Complete document review before final submission.' : 'Payment is required before the application can be submitted.' }}</p>
+                  <p>{{ paymentPaid ? 'Payment is verified. Complete document review before final submission.' : isStaffApplicant ? 'Staff access must be recorded before submission.' : 'Payment is required before the application can be submitted.' }}</p>
                 </div>
                 <div class="progress-meter">
                   <div class="progress-bar"><span [style.width.%]="uploadPercent"></span></div>
@@ -307,11 +311,14 @@ interface UploadDoc {
                 <div class="progress-list">
                   <div [class.is-complete]="passportDoc.files.length"><b></b><span>Passport data page</span></div>
                   <div [class.is-complete]="completeRequired === requiredDocs.length"><b></b><span>Required uploads</span></div>
-                  <div [class.is-complete]="paymentPaid"><b></b><span>{{ paymentPaid ? 'Payment verified' : 'Payment pending' }}</span></div>
+                  <div [class.is-complete]="paymentPaid"><b></b><span>{{ paymentPaid ? (isStaffApplicant ? 'Staff recorded' : 'Payment verified') : (isStaffApplicant ? 'Staff pending' : 'Payment pending') }}</span></div>
                   <div [class.is-complete]="reviewConfirmed"><b></b><span>Applicant review</span></div>
                 </div>
-                <button class="btn btn-blue btn-block" type="button" *ngIf="!paymentPaid" [disabled]="paymentWorking" (click)="startPaystackPayment()">
+                <button class="btn btn-blue btn-block" type="button" *ngIf="!paymentPaid && !isStaffApplicant" [disabled]="paymentWorking" (click)="startPaystackPayment()">
                   {{ paymentWorking ? 'Opening Paystack...' : 'Pay to submit · ' + totalDueLabel }}
+                </button>
+                <button class="btn btn-blue btn-block" type="button" *ngIf="!paymentPaid && isStaffApplicant" [disabled]="paymentWorking" (click)="recordStaffPayment()">
+                  {{ paymentWorking ? 'Recording...' : 'Record staff access' }}
                 </button>
                 <button class="btn btn-blue btn-block" type="submit" form="visaApplicationForm" *ngIf="paymentPaid" [disabled]="!reviewConfirmed">
                   Submit and review
@@ -345,6 +352,7 @@ export class VisaComponent implements OnInit {
   reviewConfirmed = false;
   currentApplicant: EligibleApplicant | null = null;
   existingApplication: VisaApplication | null = null;
+  pricing: VisaPricing = { basic: 745000, premium: 745000, staff: 0 };
 
   loginModel = { email: '', accessCode: '' };
   signupModel = { name: '', email: '', phone: '', accessCode: '', confirmAccessCode: '', category: '', notes: '' };
@@ -384,7 +392,17 @@ export class VisaComponent implements OnInit {
   constructor(private api: ApiService) {}
 
   ngOnInit(): void {
+    void this.loadPricing();
     void this.loadSession();
+  }
+
+  async loadPricing(): Promise<void> {
+    try {
+      const { pricing } = await this.api.getVisaPricing();
+      this.pricing = pricing;
+    } catch {
+      this.pricing = { basic: 745000, premium: 745000, staff: 0 };
+    }
   }
 
   get activeDocs(): UploadDoc[] {
@@ -426,12 +444,34 @@ export class VisaComponent implements OnInit {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
   }
 
+  get applicantUserType(): 'basic' | 'premium' | 'staff' {
+    const type = this.currentApplicant?.userType || this.application.userType || 'basic';
+    return ['basic', 'premium', 'staff'].includes(type) ? type : 'basic';
+  }
+
+  get isStaffApplicant(): boolean {
+    return this.applicantUserType === 'staff';
+  }
+
+  get applicantUserTypeLabel(): string {
+    if (this.applicantUserType === 'premium') return 'Premium';
+    if (this.applicantUserType === 'staff') return 'Staff';
+    return 'Basic';
+  }
+
   get totalDue(): number {
-    return this.applicantCount * 745000;
+    if (this.isStaffApplicant) return 0;
+    const perApplicant = this.applicantUserType === 'premium' ? this.pricing.premium : this.pricing.basic;
+    return this.applicantCount * Number(perApplicant || 0);
   }
 
   get totalDueLabel(): string {
+    if (this.isStaffApplicant) return 'No payment required';
     return `NGN ${this.totalDue.toLocaleString()}`;
+  }
+
+  get basicPriceLabel(): string {
+    return `NGN ${Number(this.pricing.basic || 0).toLocaleString()}`;
   }
 
   get paymentPaid(): boolean {
@@ -447,7 +487,7 @@ export class VisaComponent implements OnInit {
   }
 
   get paymentStatusLabel(): string {
-    if (this.paymentPaid) return 'Paid';
+    if (this.paymentPaid) return this.isStaffApplicant ? 'Staff recorded' : 'Paid';
     if (this.paymentPending) return 'Payment pending';
     if (this.paymentFailed) return 'Payment failed';
     return 'Unpaid';
@@ -459,6 +499,7 @@ export class VisaComponent implements OnInit {
 
   get progressStatusText(): string {
     if (!this.paymentPaid) {
+      if (this.isStaffApplicant) return this.paymentStatus || 'Staff access will be recorded before final submission.';
       return this.paymentStatus || (this.uploadSectionVisible
         ? 'Documents can be uploaded now. Pay with card before final submission.'
         : 'Choose pay now or continue to uploads. Submission stays locked until payment is verified.');
@@ -475,6 +516,7 @@ export class VisaComponent implements OnInit {
       phone: '',
       applicants: '1',
       applicantCategory: '',
+      userType: 'basic',
       passportExpiry: '',
       travelDate: '',
       travelHistory: '',
@@ -482,7 +524,7 @@ export class VisaComponent implements OnInit {
       salary: '',
       employmentLength: '',
       notes: '',
-      fee: 'NGN745,000 per applicant package: visa fee included, admin processing fee included, Headies ticket fee included',
+      fee: 'Basic visa package: visa fee included, admin processing fee included, Headies ticket fee included',
       status: 'Draft',
       paymentStatus: 'Unpaid',
       paymentReference: '',
@@ -571,7 +613,8 @@ export class VisaComponent implements OnInit {
       name: applicant.name,
       email: applicant.email,
       phone: applicant.phone,
-      applicantCategory: applicant.category
+      applicantCategory: applicant.category,
+      userType: applicant.userType || 'basic'
     };
     try {
       const { application } = await this.api.getApplication(applicant.id);
@@ -583,6 +626,7 @@ export class VisaComponent implements OnInit {
       this.application.email = this.application.email || applicant.email;
       this.application.phone = this.application.phone || applicant.phone;
       this.application.applicantCategory = this.application.applicantCategory || applicant.category;
+      this.application.userType = applicant.userType || application.userType || 'basic';
       this.hydrateUploads(application.uploads || []);
       this.uploadUnlocked = this.paymentPaid || Boolean((application.uploads || []).some((upload) => (upload.files || []).length));
       if (application.passportDetails?.parsed) {
@@ -595,6 +639,9 @@ export class VisaComponent implements OnInit {
       this.uploadUnlocked = false;
       this.passportStatus = '';
       await this.verifyPaymentCallbackIfNeeded();
+    }
+    if (this.isStaffApplicant && !this.paymentPaid) {
+      await this.recordStaffPayment();
     }
     setTimeout(() => location.hash = 'visa-upload');
   }
@@ -626,12 +673,42 @@ export class VisaComponent implements OnInit {
 
   openUploadsBeforePayment(): void {
     this.uploadUnlocked = true;
-    this.paymentStatus = 'Uploads are open. Payment is still required before final submission.';
+    this.paymentStatus = this.isStaffApplicant
+      ? 'Uploads are open. Staff access does not require card payment.'
+      : 'Uploads are open. Payment is still required before final submission.';
+  }
+
+  async recordStaffPayment(): Promise<void> {
+    if (!this.currentApplicant) return;
+    this.paymentWorking = true;
+    this.paymentStatus = 'Recording staff visa access...';
+    try {
+      const { application, payment } = await this.api.initializePaystackPayment({
+        ...this.application,
+        id: this.currentApplicant.id,
+        applicantId: this.currentApplicant.id,
+        applicants: String(this.applicantCount),
+        userType: 'staff',
+        uploads: undefined
+      }, `${location.origin}/visa`);
+      this.mergeApplication(application);
+      this.existingApplication = application;
+      this.uploadUnlocked = true;
+      this.paymentStatus = payment.staff ? 'Staff access recorded. Continue upload and review.' : 'Staff access recorded.';
+    } catch (error) {
+      this.paymentStatus = error instanceof Error ? error.message : 'Could not record staff access.';
+    } finally {
+      this.paymentWorking = false;
+    }
   }
 
   async startPaystackPayment(): Promise<void> {
     if (!this.currentApplicant) {
       this.paymentStatus = 'Sign in before payment.';
+      return;
+    }
+    if (this.isStaffApplicant) {
+      await this.recordStaffPayment();
       return;
     }
     if (!this.application.email) {
@@ -868,7 +945,9 @@ export class VisaComponent implements OnInit {
       return;
     }
     if (!this.paymentPaid) {
-      this.applicationStatus = 'Verified Paystack payment is required before submission. You can keep uploading documents.';
+      this.applicationStatus = this.isStaffApplicant
+        ? 'Staff access must be recorded before submission. You can keep uploading documents.'
+        : 'Verified Paystack payment is required before submission. You can keep uploading documents.';
       return;
     }
     if (!this.reviewConfirmed) {
