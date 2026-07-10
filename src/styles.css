@@ -70,6 +70,41 @@
   grid-template-columns: minmax(0, 1fr) !important;
 }
 
+.allowlist-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(8, 13, 22, .5);
+}
+
+.allowlist-toolbar .field {
+  margin: 0;
+}
+
+.allowlist-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.allowlist-search .btn {
+  min-width: 76px;
+}
+
+.allowlist-results {
+  margin: 0 0 11px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .admin-card[hidden],
 .admin-import-card[hidden],
 .admin-grid[hidden] {
@@ -1041,6 +1076,21 @@
   .admin-card .table-wrap {
     overflow: visible;
     border: 0;
+  }
+
+  .allowlist-toolbar,
+  .allowlist-search {
+    grid-template-columns: 1fr;
+  }
+
+  .allowlist-toolbar {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .allowlist-results {
+    margin: 0;
+    white-space: normal;
   }
 
   .admin-card .data-table,

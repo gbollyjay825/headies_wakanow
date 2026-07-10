@@ -310,11 +310,30 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, UploadGroup, VisaApp
                     </div>
                   </div>
                   <div class="empty-state" *ngIf="!applicants.length">No approved emails have been preloaded yet.</div>
-                  <div class="table-wrap" *ngIf="applicants.length">
+                  <div class="allowlist-toolbar" *ngIf="applicants.length">
+                    <div class="allowlist-search">
+                      <label class="field">
+                        <span class="form-label">Search allowlist</span>
+                        <input
+                          name="allowlistSearch"
+                          type="search"
+                          [(ngModel)]="allowlistSearch"
+                          placeholder="Name, email, phone, type, category or status"
+                          aria-describedby="allowlistSearchSummary"
+                        >
+                      </label>
+                      <button class="btn btn-ghost btn-small" type="button" *ngIf="allowlistSearch" (click)="allowlistSearch = ''">Clear</button>
+                    </div>
+                    <p class="allowlist-results" id="allowlistSearchSummary" aria-live="polite">
+                      Showing {{ filteredApplicants.length }} of {{ applicants.length }}
+                    </p>
+                  </div>
+                  <div class="empty-state" *ngIf="applicants.length && !filteredApplicants.length">No allowlist users match your search.</div>
+                  <div class="table-wrap" *ngIf="filteredApplicants.length">
                     <table class="data-table data-table--allowlist">
                       <thead><tr><th>Applicant</th><th>Email</th><th>Access code</th><th>Type</th><th>Category</th><th>Status</th><th>Signup</th><th>Actions</th></tr></thead>
                       <tbody>
-                        <tr *ngFor="let applicant of applicants">
+                        <tr *ngFor="let applicant of filteredApplicants">
                           <td data-label="Applicant"><strong>{{ applicant.name || 'Unnamed' }}</strong><div>{{ applicant.phone }}</div></td>
                           <td data-label="Email">{{ applicant.email }}</td>
                           <td data-label="Access code">
@@ -377,6 +396,7 @@ export class AdminComponent implements OnInit {
   selectedImportFileName = '';
   activeTab: 'applications' | 'setup' | 'allowlist' = 'applications';
   applicationSearch = '';
+  allowlistSearch = '';
   applicationPaymentFilter: 'all' | NonNullable<VisaApplication['paymentStatus']> = 'all';
   selectedApplicationId = '';
 
@@ -430,6 +450,20 @@ export class AdminComponent implements OnInit {
         app.travelDate
       ].some((value) => String(value || '').toLowerCase().includes(query));
     });
+  }
+
+  get filteredApplicants(): EligibleApplicant[] {
+    const query = this.allowlistSearch.trim().toLowerCase();
+    if (!query) return this.applicants;
+    return this.applicants.filter((applicant) => [
+      applicant.name,
+      applicant.email,
+      applicant.phone,
+      applicant.userType || 'basic',
+      applicant.category,
+      applicant.status,
+      applicant.signupCompletedAt ? 'code set signed up' : 'awaiting signup'
+    ].some((value) => String(value || '').toLowerCase().includes(query)));
   }
 
   get selectedApplication(): VisaApplication | null {
