@@ -561,8 +561,11 @@ export class VisaComponent implements OnInit {
         category: this.signupModel.category,
         notes: this.signupModel.notes
       });
-      if (applicant.status === 'active') this.signupStatus = 'Your approved profile is ready. Sign in with your access code.';
-      else if (applicant.status === 'blocked') this.signupStatus = 'This profile cannot request access. Contact the visa admin team.';
+      if (applicant.status === 'active') {
+        this.saveSession(applicant);
+        await this.openPortal(applicant);
+        this.signupStatus = 'Access confirmed. Continue your visa application.';
+      } else if (applicant.status === 'blocked') this.signupStatus = 'This profile cannot request access. Contact the visa admin team.';
       else this.signupStatus = 'Access request received. Use your chosen code after admin approval.';
       if (applicant.status === 'pending') this.signupModel = { name: '', email: '', phone: '', accessCode: '', confirmAccessCode: '', category: '', notes: '' };
     } catch (error) {

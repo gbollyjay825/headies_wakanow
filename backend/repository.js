@@ -19,13 +19,6 @@ function makeId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function makeAccessCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let index = 0; index < 8; index += 1) code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
-}
-
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
@@ -358,7 +351,6 @@ async function upsertEligibleRecordsPg(records, options = {}) {
       throw forbiddenError('Super admin access is required to create premium or staff visa users.');
     }
     const explicitAccessCode = String(record.accessCode || record.AccessCode || record.code || record.Code || '').trim();
-    const accessCode = explicitAccessCode || makeAccessCode();
     await pool.query(
       `insert into visa_eligible_applicants
         (id, name, email, phone, access_code, category, user_type, status, source, notes, signup_completed_at, created_at, updated_at)
@@ -379,7 +371,7 @@ async function upsertEligibleRecordsPg(records, options = {}) {
         String(record.name || record.Name || ''),
         email,
         String(record.phone || record.Phone || ''),
-        accessCode,
+        explicitAccessCode,
         String(record.category || record.Category || ''),
         userType,
         String(record.status || record.Status || 'active'),
@@ -400,13 +392,38 @@ async function signupApplicantPg(record) {
   if (!existingResult.rows[0]) throw preloadedEmailRequiredError();
   const existing = existingResult.rows[0];
   if (existing.status === 'blocked') return toEligible(existing);
-  const preserveExistingCode = Boolean(existing.signup_completed_at);
+  if (existing.signup_completed_at) {
+    const existingCode = String(existing.access_code || '').trim().toLowerCase();
+    if (existingCode !== accessCode.toLowerCase()) {
+      const error = new Error('This email already has an access code. Sign in with your existing code or ask the admin team to reset it.');
+      error.status = 409;
+      throw error;
+    }
+    const result = await pool.query(
+      `update visa_eligible_applicants
+       set name = coalesce(nullif($2, ''), name),
+           phone = coalesce(nullif($3, ''), phone),
+           category = coalesce(nullif($4, ''), category),
+           notes = coalesce(nullif($5, ''), notes),
+           updated_at = now()
+       where email = $1
+       returning *`,
+      [
+        email,
+        String(record.name || '').trim(),
+        String(record.phone || '').trim(),
+        String(record.category || '').trim(),
+        String(record.notes || '').trim()
+      ]
+    );
+    return toEligible(result.rows[0]);
+  }
 
   const result = await pool.query(
     `update visa_eligible_applicants
      set name = coalesce(nullif($2, ''), name),
          phone = coalesce(nullif($3, ''), phone),
-         access_code = case when $7::boolean then access_code else $4 end,
+         access_code = $4,
          category = coalesce(nullif($5, ''), category),
          notes = coalesce(nullif($6, ''), notes),
          source = 'admin',
@@ -420,8 +437,7 @@ async function signupApplicantPg(record) {
       String(record.phone || '').trim(),
       accessCode,
       String(record.category || '').trim(),
-      String(record.notes || '').trim(),
-      preserveExistingCode
+      String(record.notes || '').trim()
     ]
   );
   return toEligible(result.rows[0]);
@@ -836,7 +852,7 @@ async function upsertEligibleRecordsJson(records, options = {}) {
       name: String(record.name || record.Name || (existing && existing.name) || '').trim(),
       email,
       phone: String(record.phone || record.Phone || (existing && existing.phone) || '').trim(),
-      accessCode: String(explicitAccessCode || (existing && existing.accessCode) || makeAccessCode()).trim(),
+      accessCode: String(explicitAccessCode || (existing && existing.accessCode) || '').trim(),
       category: String(record.category || record.Category || (existing && existing.category) || '').trim(),
       userType,
       status: String(record.status || record.Status || (existing && existing.status) || 'active').trim() || 'active',
@@ -862,13 +878,28 @@ async function signupApplicantJson(record) {
   const existing = store.eligibleApplicants.find((item) => normalizeEmail(item.email) === email);
   if (!existing) throw preloadedEmailRequiredError();
   if (existing.status === 'blocked') return { ...existing, userType: normalizeUserType(existing.userType) };
-  const preserveExistingCode = Boolean(existing.signupCompletedAt);
+  if (existing.signupCompletedAt) {
+    if (String(existing.accessCode || '').trim().toLowerCase() !== accessCode.toLowerCase()) {
+      const error = new Error('This email already has an access code. Sign in with your existing code or ask the admin team to reset it.');
+      error.status = 409;
+      throw error;
+    }
+    Object.assign(existing, {
+      name: String(record.name || existing.name || '').trim(),
+      phone: String(record.phone || existing.phone || '').trim(),
+      category: String(record.category || existing.category || '').trim(),
+      notes: String(record.notes || existing.notes || '').trim(),
+      updatedAt: now()
+    });
+    writeStore(store);
+    return { ...existing, userType: normalizeUserType(existing.userType) };
+  }
   const next = {
     id: existing.id,
     name: String(record.name || (existing && existing.name) || '').trim(),
     email,
     phone: String(record.phone || (existing && existing.phone) || '').trim(),
-    accessCode: preserveExistingCode ? existing.accessCode : accessCode,
+    accessCode,
     category: String(record.category || (existing && existing.category) || '').trim(),
     userType: normalizeUserType(existing.userType),
     status: existing.status || 'active',
