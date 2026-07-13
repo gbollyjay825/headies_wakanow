@@ -42,7 +42,7 @@ interface UploadDoc {
             <a class="is-active" routerLink="/visa">Visa</a>
           </nav>
           <div class="nav-actions">
-            <a class="btn btn-primary" href="#apply">Start application</a>
+            <a class="btn btn-primary" [attr.href]="portalVisible ? '#visa-upload' : '#apply'">{{ portalVisible ? 'Continue application' : 'Start application' }}</a>
           </div>
           <button class="mobile-menu" type="button" [class.is-open]="mobileMenuOpen" [attr.aria-expanded]="mobileMenuOpen" aria-controls="visa-mobile-menu" aria-label="Toggle menu" (click)="mobileMenuOpen = !mobileMenuOpen">
             <span class="mobile-menu__bars" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -54,12 +54,12 @@ interface UploadDoc {
           <a routerLink="/" fragment="packages" (click)="mobileMenuOpen = false">Packages</a>
           <a routerLink="/" fragment="luxury" (click)="mobileMenuOpen = false">Luxury service</a>
           <a class="is-active" routerLink="/visa" (click)="mobileMenuOpen = false">Visa</a>
-          <a class="mobile-drawer__cta" href="#apply" (click)="mobileMenuOpen = false">Start application</a>
+          <a class="mobile-drawer__cta" [attr.href]="portalVisible ? '#visa-upload' : '#apply'" (click)="mobileMenuOpen = false">{{ portalVisible ? 'Continue application' : 'Start application' }}</a>
         </nav>
       </header>
 
       <main>
-        <section class="page-hero">
+        <section class="page-hero" [hidden]="portalVisible">
           <div class="container page-hero__grid">
             <div>
               <p class="eyebrow">Canada visa | Toronto</p>
@@ -70,30 +70,36 @@ interface UploadDoc {
           </div>
         </section>
 
-        <section class="section" id="apply">
-          <div class="container split-layout visa-apply-layout" [class.split-layout--full]="portalVisible">
-            <div>
-              <div class="process-grid">
-                <div class="process-card"><b>1</b><h3>Request access</h3><p>Applicants sign up or use admin-issued credentials.</p></div>
-                <div class="process-card"><b>2</b><h3>Upload documents</h3><p>Approved applicants submit required files.</p></div>
-                <div class="process-card"><b>3</b><h3>Processing begins</h3><p>Details are prepared for Wakanow visa review.</p></div>
-              </div>
+        <section class="section visa-entry" id="apply" [hidden]="portalVisible">
+          <div class="container split-layout visa-apply-layout">
+            <div class="visa-entry__main">
+              <ol class="visa-journey" aria-label="Visa application process">
+                <li><b>1</b><div><h3>Confirm access</h3><p>Sign in with your approved email and access code.</p></div></li>
+                <li><b>2</b><div><h3>Prepare documents</h3><p>Complete the forms and upload the required files.</p></div></li>
+                <li><b>3</b><div><h3>Submit for review</h3><p>Pay, confirm your details and send the application.</p></div></li>
+              </ol>
 
-              <article class="portal-card requirements-card">
+              <article class="requirements-card requirements-card--overview">
                 <div class="requirements-card__intro">
                   <p class="section-kicker">Canada Business Visa</p>
-                  <h2 class="section-title" style="font-size:26px">Requirements and application guide</h2>
-                  <p style="margin:8px 0 18px;color:var(--muted)">Basic package is <strong style="color:var(--text)">{{ basicPriceLabel }}</strong> per applicant. Premium or staff handling is applied from the approved allowlist profile after sign in.</p>
-                  <ul class="fee-breakdown fee-breakdown--compact" aria-label="Visa package breakdown">
+                  <h2 class="section-title">Prepare once. Upload securely.</h2>
+                  <p class="requirements-card__copy">The basic package is <strong>{{ basicPriceLabel }}</strong> per applicant. Premium or staff handling is applied automatically from the approved profile after sign in.</p>
+                  <ul class="package-includes" aria-label="Visa package includes">
                     <li><span>Visa fee</span><strong>Included</strong></li>
                     <li><span>Admin processing fee</span><strong>Included</strong></li>
                     <li><span>Headies ticket fee</span><strong>Included</strong></li>
                   </ul>
-                  <div class="pss-note" style="margin-top:20px"><strong>Portal</strong><span>Applicants must be approved by an admin before upload access is enabled.</span></div>
+                  <div class="portal-access-note"><strong>Approved applicants only</strong><span>Your email must be on the allowlist before you can create or access an application.</span></div>
                 </div>
-                <div class="requirement-grid">
-                  <div class="requirement" *ngFor="let item of requirements">{{ item }}</div>
-                </div>
+                <details class="requirements-disclosure">
+                  <summary>
+                    <span><strong>Required document checklist</strong><small>{{ requirements.length }} core documents</small></span>
+                    <b>View checklist</b>
+                  </summary>
+                  <div class="requirement-grid">
+                    <div class="requirement" *ngFor="let item of requirements">{{ item }}</div>
+                  </div>
+                </details>
               </article>
             </div>
 
@@ -144,7 +150,7 @@ interface UploadDoc {
           </div>
         </section>
 
-        <section class="section portal-hidden" id="visa-upload" [hidden]="!portalVisible">
+        <section class="section portal-hidden portal-workspace" id="visa-upload" [hidden]="!portalVisible">
           <div class="container portal-shell">
             <div class="portal-top">
               <div>
@@ -173,8 +179,8 @@ interface UploadDoc {
                 <section class="portal-card payment-card" [class.is-paid]="paymentPaid">
                   <div class="payment-card__copy">
                     <p class="section-kicker">Payment step</p>
-                    <h2>{{ isStaffApplicant ? 'Staff visa access' : paymentPaid ? 'Payment verified' : 'Choose how to continue' }}</h2>
-                    <p>{{ isStaffApplicant ? 'This staff profile does not require card payment. A staff transaction is recorded for audit before submission.' : paymentPaid ? 'Payment has been verified. Continue with the applicant documents and final review.' : 'Pay securely by card now, or continue to the document checklist and pay before final submission.' }}</p>
+                    <h2>{{ isStaffApplicant ? 'Staff visa access' : paymentPaid ? 'Payment verified' : 'Pay before submission' }}</h2>
+                    <p>{{ isStaffApplicant ? 'This staff profile does not require card payment. A staff transaction is recorded for audit before submission.' : paymentPaid ? 'Payment has been verified. Continue with the applicant documents and final review.' : 'Pay securely by card to unlock final submission. You can prepare and upload your documents first if they are not ready yet.' }}</p>
                     <div class="payment-card__meta">
                       <span class="pill" [class.pill--ok]="paymentPaid" [class.pill--warn]="paymentPending || paymentFailed">{{ paymentStatusLabel }}</span>
                       <small *ngIf="application.paymentReference">Reference {{ application.paymentReference }}</small>
@@ -199,10 +205,10 @@ interface UploadDoc {
                       <button class="btn btn-blue btn-block" type="button" *ngIf="isStaffApplicant" [disabled]="paymentWorking || paymentPaid" (click)="recordStaffPayment()">
                         {{ paymentPaid ? 'Staff access recorded' : paymentWorking ? 'Recording...' : 'Record staff access' }}
                       </button>
-                      <button class="btn btn-secondary btn-block" type="button" *ngIf="!paymentPaid && !uploadSectionVisible" (click)="openUploadsBeforePayment()">Continue to uploads</button>
+                      <button class="payment-card__link" type="button" *ngIf="!paymentPaid && !uploadSectionVisible" (click)="openUploadsBeforePayment()">Prepare documents before payment</button>
                     </div>
-                    <p class="payment-card__hint" *ngIf="!paymentPaid">
-                      {{ isStaffApplicant ? 'Staff submission unlocks once the staff transaction is recorded.' : uploadSectionVisible ? 'Uploads are open. Payment is still required before you can submit.' : 'You can upload first, but submission stays locked until Paystack verifies payment.' }}
+                    <p class="payment-card__hint" *ngIf="!paymentPaid && uploadSectionVisible">
+                      {{ isStaffApplicant ? 'Staff submission unlocks once the staff transaction is recorded.' : 'Uploads are open. Complete payment before final submission.' }}
                     </p>
                     <p class="form-status" role="status">{{ paymentStatus }}</p>
                   </div>
@@ -218,32 +224,30 @@ interface UploadDoc {
                     <span class="badge">Portal save ready</span>
                   </div>
 
-                  <section class="visa-templates" aria-labelledby="visaTemplatesTitle">
-                    <div class="visa-templates__head">
-                      <span class="badge">Download forms</span>
-                      <div>
-                        <h3 id="visaTemplatesTitle">Visa forms and checklist</h3>
-                        <p>Download and complete the applicable forms, then upload the finished documents below.</p>
-                      </div>
-                    </div>
+                  <details class="visa-templates" open>
+                    <summary class="visa-templates__summary">
+                      <span class="visa-template-filetype" aria-hidden="true">PDF</span>
+                      <span class="visa-templates__copy"><strong>Required visa forms and checklist</strong><small>Download these official PDFs, complete the applicable forms, then upload the finished copies below.</small></span>
+                      <span class="visa-templates__count">3 downloads</span>
+                    </summary>
                     <div class="visa-template-list">
                       <a class="visa-template-link" href="/assets/visa-templates/canada-temporary-resident-visa-checklist.pdf" download="canada-temporary-resident-visa-checklist.pdf">
                         <span class="visa-template-filetype" aria-hidden="true">PDF</span>
                         <span class="visa-template-copy"><strong>Canada visa checklist</strong><small>Temporary resident visa · 2 pages</small></span>
-                        <span class="visa-template-action">Download</span>
+                        <span class="visa-template-action">Download PDF</span>
                       </a>
                       <a class="visa-template-link" href="/assets/visa-templates/imm5257e-visitor-visa-application.pdf" download="imm5257e-visitor-visa-application.pdf">
                         <span class="visa-template-filetype" aria-hidden="true">PDF</span>
                         <span class="visa-template-copy"><strong>IMM 5257 application form</strong><small>Visitor visa application · 5 pages</small></span>
-                        <span class="visa-template-action">Download</span>
+                        <span class="visa-template-action">Download PDF</span>
                       </a>
                       <a class="visa-template-link" href="/assets/visa-templates/imm5645e-family-information.pdf" download="imm5645e-family-information.pdf">
                         <span class="visa-template-filetype" aria-hidden="true">PDF</span>
                         <span class="visa-template-copy"><strong>IMM 5645 family information</strong><small>Family information form · 2 pages</small></span>
-                        <span class="visa-template-action">Download</span>
+                        <span class="visa-template-action">Download PDF</span>
                       </a>
                     </div>
-                  </section>
+                  </details>
 
                   <section class="passport-intake" [class.is-complete]="passportDoc.files.length">
                   <div class="passport-intake__copy">
@@ -270,6 +274,10 @@ interface UploadDoc {
                   </div>
                 </section>
 
+                  <div class="form-section-head">
+                    <div><span>Applicant details</span><h3>Confirm your information</h3></div>
+                    <p>Check the contact, category and travel details before continuing.</p>
+                  </div>
                   <div class="field-grid">
                   <label class="field"><span class="form-label">Name</span><input name="name" [(ngModel)]="application.name" required class="readonly-field"></label>
                   <label class="field"><span class="form-label">Phone</span><input name="appPhone" [(ngModel)]="application.phone" required></label>
@@ -288,6 +296,10 @@ interface UploadDoc {
                 </div>
                   <label class="field" style="margin-top:14px"><span class="form-label">Travel history summary</span><textarea name="travelHistory" [(ngModel)]="application.travelHistory"></textarea></label>
 
+                  <div class="form-section-head form-section-head--documents">
+                    <div><span>Document checklist</span><h3>Upload required files</h3></div>
+                    <p>Files save to your application as soon as each upload completes.</p>
+                  </div>
                   <div class="upload-progress" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="uploadPercent" style="margin:20px 0">
                   <div class="progress-bar"><span [style.width.%]="uploadPercent"></span></div>
                   <p style="margin:8px 0 0;color:var(--muted);font-size:13px">{{ completeRequired }} of {{ requiredDocs.length }} required uploads ready</p>
