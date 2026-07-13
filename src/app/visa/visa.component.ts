@@ -218,6 +218,33 @@ interface UploadDoc {
                     <span class="badge">Portal save ready</span>
                   </div>
 
+                  <section class="visa-templates" aria-labelledby="visaTemplatesTitle">
+                    <div class="visa-templates__head">
+                      <span class="badge">Download forms</span>
+                      <div>
+                        <h3 id="visaTemplatesTitle">Visa forms and checklist</h3>
+                        <p>Download and complete the applicable forms, then upload the finished documents below.</p>
+                      </div>
+                    </div>
+                    <div class="visa-template-list">
+                      <a class="visa-template-link" href="/assets/visa-templates/canada-temporary-resident-visa-checklist.pdf" download="canada-temporary-resident-visa-checklist.pdf">
+                        <span class="visa-template-filetype" aria-hidden="true">PDF</span>
+                        <span class="visa-template-copy"><strong>Canada visa checklist</strong><small>Temporary resident visa · 2 pages</small></span>
+                        <span class="visa-template-action">Download</span>
+                      </a>
+                      <a class="visa-template-link" href="/assets/visa-templates/imm5257e-visitor-visa-application.pdf" download="imm5257e-visitor-visa-application.pdf">
+                        <span class="visa-template-filetype" aria-hidden="true">PDF</span>
+                        <span class="visa-template-copy"><strong>IMM 5257 application form</strong><small>Visitor visa application · 5 pages</small></span>
+                        <span class="visa-template-action">Download</span>
+                      </a>
+                      <a class="visa-template-link" href="/assets/visa-templates/imm5645e-family-information.pdf" download="imm5645e-family-information.pdf">
+                        <span class="visa-template-filetype" aria-hidden="true">PDF</span>
+                        <span class="visa-template-copy"><strong>IMM 5645 family information</strong><small>Family information form · 2 pages</small></span>
+                        <span class="visa-template-action">Download</span>
+                      </a>
+                    </div>
+                  </section>
+
                   <section class="passport-intake" [class.is-complete]="passportDoc.files.length">
                   <div class="passport-intake__copy">
                     <span class="badge">{{ passportDoc.files.length ? 'Passport captured' : 'Start here' }}</span>

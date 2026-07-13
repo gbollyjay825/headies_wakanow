@@ -372,6 +372,113 @@
   font-size: 12px;
 }
 
+.visa-templates {
+  margin: 0 0 22px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.visa-templates__head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.visa-templates__head .badge {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.visa-templates__head h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.visa-templates__head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.visa-template-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.visa-template-link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 5px 10px;
+  align-content: center;
+  min-width: 0;
+  min-height: 116px;
+  padding: 14px;
+  border-right: 1px solid var(--line);
+  background: rgba(8, 13, 22, .46);
+  color: var(--text);
+  text-decoration: none;
+  transition: background .18s ease, border-color .18s ease;
+}
+
+.visa-template-link:last-child {
+  border-right: 0;
+}
+
+.visa-template-link:hover,
+.visa-template-link:focus-visible {
+  background: rgba(121, 173, 255, .1);
+}
+
+.visa-template-filetype {
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 126, 31, .42);
+  border-radius: var(--radius);
+  background: rgba(255, 126, 31, .1);
+  color: #ffd1ad;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.visa-template-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.visa-template-copy strong,
+.visa-template-copy small {
+  overflow-wrap: anywhere;
+}
+
+.visa-template-copy strong {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.visa-template-copy small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.visa-template-action {
+  color: #cae0ff;
+  font-size: 11px;
+  font-weight: 850;
+}
+
 .progress-panel {
   position: sticky;
   top: 96px;
@@ -1019,6 +1126,24 @@
 
   .upload-section__header {
     gap: 10px;
+  }
+
+  .visa-templates__head {
+    display: grid;
+  }
+
+  .visa-template-list {
+    grid-template-columns: 1fr;
+  }
+
+  .visa-template-link {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .visa-template-link:last-child {
+    border-bottom: 0;
   }
 
   .passport-intake {
