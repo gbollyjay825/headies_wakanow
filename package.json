@@ -12,6 +12,7 @@
     "start": "node server.js",
     "dev": "node server.js",
     "dev:angular": "ng serve --host 127.0.0.1 --port 4200",
+    "test": "node --test test/*.test.js",
     "db:migrate": "node scripts/migrate.js"
   },
   "dependencies": {

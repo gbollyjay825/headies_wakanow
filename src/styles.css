@@ -541,6 +541,26 @@
   color: var(--text);
 }
 
+.staff-payment-note {
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid rgba(55, 194, 118, .38);
+  border-radius: var(--radius);
+  background: rgba(55, 194, 118, .08);
+}
+
+.staff-payment-note strong {
+  color: #b6f7cf;
+  font-size: 13px;
+}
+
+.staff-payment-note span {
+  color: #a9c8b6;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .upload-section {
   padding: 28px;
 }

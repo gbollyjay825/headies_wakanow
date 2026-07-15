@@ -75,6 +75,36 @@ function makeStaffReference(applicationId) {
   return `staff-${safeId}-${Date.now().toString(36)}`;
 }
 
+function staffSubmissionFields(applicationId, existing) {
+  const alreadyPaid = existing && existing.paymentStatus === 'Paid';
+  return {
+    paymentStatus: 'Paid',
+    paymentReference: alreadyPaid
+      ? existing.paymentReference
+      : ((existing && existing.paymentReference && existing.paymentReference.startsWith('staff-'))
+        ? existing.paymentReference
+        : makeStaffReference(applicationId)),
+    paymentAmount: alreadyPaid ? Number(existing.paymentAmount || 0) : 0,
+    paymentCurrency: (existing && existing.paymentCurrency) || 'NGN',
+    paymentPaidAt: (alreadyPaid && existing.paymentPaidAt) || now(),
+    userType: 'staff',
+    fee: feeLabelFor('staff')
+  };
+}
+
+async function submissionPaymentPolicy(applicationId, existing) {
+  const eligible = await repository.getEligible((existing && existing.applicantId) || applicationId);
+  const isStaff = Boolean(
+    eligible &&
+    eligible.status === 'active' &&
+    normalizeUserType(eligible.userType) === 'staff'
+  );
+  return {
+    isStaff,
+    fields: isStaff ? staffSubmissionFields(applicationId, existing) : safePaymentFields(existing)
+  };
+}
+
 function priceForUserType(pricing, userType) {
   if (userType === 'premium') return Number(pricing.premium || 0);
   if (userType === 'staff') return 0;
@@ -454,7 +484,9 @@ async function handleApi(method, pathname, body = {}, req = null) {
       if (nextBody.status === 'Submitted') {
         const applicationId = nextBody.id || nextBody.applicantId;
         const existing = applicationId ? await repository.getApplication(applicationId) : null;
-        if (!existing || existing.paymentStatus !== 'Paid') {
+        if (!existing) return response(404, { error: 'Application not found' });
+        const paymentPolicy = await submissionPaymentPolicy(applicationId, existing);
+        if (!paymentPolicy.isStaff && existing.paymentStatus !== 'Paid') {
           return response(402, { error: 'Verified payment is required before submission.' });
         }
         if (nextBody.reviewConfirmed !== true) {
@@ -467,16 +499,18 @@ async function handleApi(method, pathname, body = {}, req = null) {
           const labels = missing.map((field) => DOC_FIELD_LABELS[field] || field).join(', ');
           return response(400, { error: `Upload the required documents before submission: ${labels}.` });
         }
-        Object.assign(nextBody, safePaymentFields(existing), { reviewedAt: now() });
+        Object.assign(nextBody, paymentPolicy.fields, { reviewedAt: now() });
       }
       const application = await repository.upsertApplication(nextBody);
       return response(201, { application });
     }
     if (method === 'PATCH' && parts.length === 4) {
+      let nextFields = { ...body };
       if (body.status === 'Submitted') {
         const existing = await repository.getApplication(parts[3]);
         if (!existing) return response(404, { error: 'Application not found' });
-        if (existing.paymentStatus !== 'Paid') {
+        const paymentPolicy = await submissionPaymentPolicy(parts[3], existing);
+        if (!paymentPolicy.isStaff && existing.paymentStatus !== 'Paid') {
           return response(402, { error: 'Verified payment is required before submission.' });
         }
         const uploaded = uploadedFieldSet(existing, undefined);
@@ -485,8 +519,13 @@ async function handleApi(method, pathname, body = {}, req = null) {
           const labels = missing.map((field) => DOC_FIELD_LABELS[field] || field).join(', ');
           return response(400, { error: `Upload the required documents before submission: ${labels}.` });
         }
+        nextFields = { ...nextFields, ...paymentPolicy.fields, reviewedAt: now() };
+        if (paymentPolicy.isStaff) {
+          const application = await repository.upsertApplication({ ...existing, ...nextFields });
+          return response(200, { application });
+        }
       }
-      const application = await repository.updateApplication(parts[3], body);
+      const application = await repository.updateApplication(parts[3], nextFields);
       if (!application) return response(404, { error: 'Application not found' });
       return response(200, { application });
     }

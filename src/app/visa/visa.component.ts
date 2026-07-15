@@ -161,7 +161,7 @@ interface UploadDoc {
               <div class="status-pills">
                 <span class="pill pill--warn" *ngIf="existingApplication">{{ existingApplication.status }}</span>
                 <span class="pill pill--muted">{{ applicantUserTypeLabel }}</span>
-                <span class="pill" [class.pill--ok]="paymentPaid" [class.pill--warn]="paymentPending || paymentFailed">{{ paymentStatusLabel }}</span>
+                <span class="pill" [class.pill--ok]="submissionPaymentSatisfied" [class.pill--warn]="!isStaffApplicant && (paymentPending || paymentFailed)">{{ paymentStatusLabel }}</span>
                 <span class="pill pill--muted">{{ fileCount }} files</span>
               </div>
               <button class="btn btn-ghost btn-small" type="button" (click)="logout()">Sign out</button>
@@ -170,19 +170,19 @@ interface UploadDoc {
             <div class="portal-stepper" aria-label="Visa application stages">
               <div class="portal-step is-active"><b>1</b><div><span>Passport</span><small>Extract details</small></div></div>
               <div class="portal-step"><b>2</b><div><span>Documents</span><small>Upload files</small></div></div>
-              <div class="portal-step" [class.is-active]="paymentPaid"><b>3</b><div><span>Payment</span><small>{{ isStaffApplicant ? 'Staff recorded' : paymentPaid ? 'Paid' : 'Required before submit' }}</small></div></div>
+              <div class="portal-step" [class.is-active]="submissionPaymentSatisfied"><b>3</b><div><span>Payment</span><small>{{ isStaffApplicant ? 'Not required' : paymentPaid ? 'Paid' : 'Required before submit' }}</small></div></div>
               <div class="portal-step" [class.is-active]="reviewConfirmed"><b>4</b><div><span>Review</span><small>Confirm before submit</small></div></div>
             </div>
 
             <div class="portal-grid">
               <form id="visaApplicationForm" class="application-flow" #applicationForm="ngForm" (ngSubmit)="submitApplication(applicationForm.valid)">
-                <section class="portal-card payment-card" [class.is-paid]="paymentPaid">
+                <section class="portal-card payment-card" [class.is-paid]="submissionPaymentSatisfied">
                   <div class="payment-card__copy">
                     <p class="section-kicker">Payment step</p>
                     <h2>{{ isStaffApplicant ? 'Staff visa access' : paymentPaid ? 'Payment verified' : 'Pay before submission' }}</h2>
-                    <p>{{ isStaffApplicant ? 'This staff profile does not require card payment. A staff transaction is recorded for audit before submission.' : paymentPaid ? 'Payment has been verified. Continue with the applicant documents and final review.' : 'Pay securely by card to unlock final submission. You can prepare and upload your documents first if they are not ready yet.' }}</p>
+                    <p>{{ isStaffApplicant ? 'This staff profile does not require card payment. Complete the documents and review; a zero-value staff waiver is recorded automatically when you submit.' : paymentPaid ? 'Payment has been verified. Continue with the applicant documents and final review.' : 'Pay securely by card to unlock final submission. You can prepare and upload your documents first if they are not ready yet.' }}</p>
                     <div class="payment-card__meta">
-                      <span class="pill" [class.pill--ok]="paymentPaid" [class.pill--warn]="paymentPending || paymentFailed">{{ paymentStatusLabel }}</span>
+                      <span class="pill" [class.pill--ok]="submissionPaymentSatisfied" [class.pill--warn]="!isStaffApplicant && (paymentPending || paymentFailed)">{{ paymentStatusLabel }}</span>
                       <small *ngIf="application.paymentReference">Reference {{ application.paymentReference }}</small>
                       <small *ngIf="!application.paymentReference">{{ isStaffApplicant ? 'Staff account, no card payment' : 'Secured through Paystack card checkout' }}</small>
                     </div>
@@ -202,13 +202,11 @@ interface UploadDoc {
                       <button class="btn btn-blue btn-block" type="button" *ngIf="!isStaffApplicant" [disabled]="paymentWorking || paymentPaid" (click)="startPaystackPayment()">
                         {{ paymentPaid ? 'Payment verified' : paymentWorking ? 'Opening Paystack...' : 'Pay now with card' }}
                       </button>
-                      <button class="btn btn-blue btn-block" type="button" *ngIf="isStaffApplicant" [disabled]="paymentWorking || paymentPaid" (click)="recordStaffPayment()">
-                        {{ paymentPaid ? 'Staff access recorded' : paymentWorking ? 'Recording...' : 'Record staff access' }}
-                      </button>
-                      <button class="payment-card__link" type="button" *ngIf="!paymentPaid && !uploadSectionVisible" (click)="openUploadsBeforePayment()">Prepare documents before payment</button>
+                      <button class="payment-card__link" type="button" *ngIf="!isStaffApplicant && !paymentPaid && !uploadSectionVisible" (click)="openUploadsBeforePayment()">Prepare documents before payment</button>
+                      <div class="staff-payment-note" *ngIf="isStaffApplicant"><strong>Payment waived</strong><span>Continue to documents and submit after review.</span></div>
                     </div>
-                    <p class="payment-card__hint" *ngIf="!paymentPaid && uploadSectionVisible">
-                      {{ isStaffApplicant ? 'Staff submission unlocks once the staff transaction is recorded.' : 'Uploads are open. Complete payment before final submission.' }}
+                    <p class="payment-card__hint" *ngIf="!isStaffApplicant && !paymentPaid && uploadSectionVisible">
+                      Uploads are open. Complete payment before final submission.
                     </p>
                     <p class="form-status" role="status">{{ paymentStatus }}</p>
                   </div>
@@ -341,7 +339,7 @@ interface UploadDoc {
                 <div class="progress-panel__head">
                   <span class="badge">Progress</span>
                   <h3>Application status</h3>
-                  <p>{{ paymentPaid ? 'Payment is verified. Complete document review before final submission.' : isStaffApplicant ? 'Staff access must be recorded before submission.' : 'Payment is required before the application can be submitted.' }}</p>
+                  <p>{{ isStaffApplicant ? 'No payment is required. Complete the documents and applicant review before submission.' : paymentPaid ? 'Payment is verified. Complete document review before final submission.' : 'Payment is required before the application can be submitted.' }}</p>
                 </div>
                 <div class="progress-meter">
                   <div class="progress-bar"><span [style.width.%]="uploadPercent"></span></div>
@@ -350,20 +348,17 @@ interface UploadDoc {
                 <div class="progress-list">
                   <div [class.is-complete]="passportDoc.files.length"><b></b><span>Passport data page</span></div>
                   <div [class.is-complete]="completeRequired === requiredDocs.length"><b></b><span>Required uploads</span></div>
-                  <div [class.is-complete]="paymentPaid"><b></b><span>{{ paymentPaid ? (isStaffApplicant ? 'Staff recorded' : 'Payment verified') : (isStaffApplicant ? 'Staff pending' : 'Payment pending') }}</span></div>
+                  <div [class.is-complete]="submissionPaymentSatisfied"><b></b><span>{{ isStaffApplicant ? 'No payment required' : paymentPaid ? 'Payment verified' : 'Payment pending' }}</span></div>
                   <div [class.is-complete]="reviewConfirmed"><b></b><span>Applicant review</span></div>
                 </div>
-                <button class="btn btn-blue btn-block" type="button" *ngIf="!paymentPaid && !isStaffApplicant" [disabled]="paymentWorking" (click)="startPaystackPayment()">
+                <button class="btn btn-blue btn-block" type="button" *ngIf="!submissionPaymentSatisfied" [disabled]="paymentWorking" (click)="startPaystackPayment()">
                   {{ paymentWorking ? 'Opening Paystack...' : 'Pay to submit · ' + totalDueLabel }}
                 </button>
-                <button class="btn btn-blue btn-block" type="button" *ngIf="!paymentPaid && isStaffApplicant" [disabled]="paymentWorking" (click)="recordStaffPayment()">
-                  {{ paymentWorking ? 'Recording...' : 'Record staff access' }}
-                </button>
-                <button class="btn btn-blue btn-block" type="submit" form="visaApplicationForm" *ngIf="paymentPaid" [disabled]="!reviewConfirmed">
+                <button class="btn btn-blue btn-block" type="submit" form="visaApplicationForm" *ngIf="submissionPaymentSatisfied" [disabled]="!reviewConfirmed">
                   Submit and review
                 </button>
                 <p class="form-status" role="status">{{ progressStatusText }}</p>
-                <div class="pss-note"><strong>Safety</strong><span>No application is sent to admin until Paystack payment is verified and review is confirmed.</span></div>
+                <div class="pss-note"><strong>Safety</strong><span>{{ isStaffApplicant ? 'Staff applications are sent only after all required documents and applicant review are complete.' : 'No application is sent to admin until Paystack payment is verified and review is confirmed.' }}</span></div>
               </aside>
             </div>
           </div>
@@ -517,6 +512,10 @@ export class VisaComponent implements OnInit {
     return this.application.paymentStatus === 'Paid';
   }
 
+  get submissionPaymentSatisfied(): boolean {
+    return this.isStaffApplicant || this.paymentPaid;
+  }
+
   get paymentPending(): boolean {
     return this.application.paymentStatus === 'Pending';
   }
@@ -526,19 +525,22 @@ export class VisaComponent implements OnInit {
   }
 
   get paymentStatusLabel(): string {
-    if (this.paymentPaid) return this.isStaffApplicant ? 'Staff recorded' : 'Paid';
+    if (this.isStaffApplicant) return 'No payment required';
+    if (this.paymentPaid) return 'Paid';
     if (this.paymentPending) return 'Payment pending';
     if (this.paymentFailed) return 'Payment failed';
     return 'Unpaid';
   }
 
   get uploadSectionVisible(): boolean {
-    return this.paymentPaid || this.uploadUnlocked;
+    return this.isStaffApplicant || this.paymentPaid || this.uploadUnlocked;
   }
 
   get progressStatusText(): string {
+    if (this.isStaffApplicant) {
+      return this.applicationStatus || 'Complete the required documents and confirm the applicant review to submit.';
+    }
     if (!this.paymentPaid) {
-      if (this.isStaffApplicant) return this.paymentStatus || 'Staff access will be recorded before final submission.';
       return this.paymentStatus || (this.uploadSectionVisible
         ? 'Documents can be uploaded now. Pay with card before final submission.'
         : 'Choose pay now or continue to uploads. Submission stays locked until payment is verified.');
@@ -682,9 +684,6 @@ export class VisaComponent implements OnInit {
       this.passportStatus = '';
       await this.verifyPaymentCallbackIfNeeded();
     }
-    if (this.isStaffApplicant && !this.paymentPaid) {
-      await this.recordStaffPayment();
-    }
     setTimeout(() => location.hash = 'visa-upload');
   }
 
@@ -720,38 +719,13 @@ export class VisaComponent implements OnInit {
       : 'Uploads are open. Payment is still required before final submission.';
   }
 
-  async recordStaffPayment(): Promise<void> {
-    if (!this.currentApplicant) return;
-    this.paymentWorking = true;
-    this.paymentStatus = 'Recording staff visa access...';
-    try {
-      this.normalizeApplicationDates();
-      const { application, payment } = await this.api.initializePaystackPayment({
-        ...this.application,
-        id: this.currentApplicant.id,
-        applicantId: this.currentApplicant.id,
-        applicants: String(this.applicantCount),
-        userType: 'staff',
-        uploads: undefined
-      }, `${location.origin}/visa`);
-      this.mergeApplication(application);
-      this.existingApplication = application;
-      this.uploadUnlocked = true;
-      this.paymentStatus = payment.staff ? 'Staff access recorded. Continue upload and review.' : 'Staff access recorded.';
-    } catch (error) {
-      this.paymentStatus = error instanceof Error ? error.message : 'Could not record staff access.';
-    } finally {
-      this.paymentWorking = false;
-    }
-  }
-
   async startPaystackPayment(): Promise<void> {
     if (!this.currentApplicant) {
       this.paymentStatus = 'Sign in before payment.';
       return;
     }
     if (this.isStaffApplicant) {
-      await this.recordStaffPayment();
+      this.paymentStatus = 'No payment is required for staff applications.';
       return;
     }
     if (!this.application.email) {
@@ -1050,10 +1024,8 @@ export class VisaComponent implements OnInit {
       this.applicationStatus = 'Complete the required fields.';
       return;
     }
-    if (!this.paymentPaid) {
-      this.applicationStatus = this.isStaffApplicant
-        ? 'Staff access must be recorded before submission. You can keep uploading documents.'
-        : 'Verified Paystack payment is required before submission. You can keep uploading documents.';
+    if (!this.submissionPaymentSatisfied) {
+      this.applicationStatus = 'Verified Paystack payment is required before submission. You can keep uploading documents.';
       return;
     }
     if (!this.reviewConfirmed) {
