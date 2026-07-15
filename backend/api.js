@@ -1,5 +1,6 @@
 const repository = require('./repository');
 const { parsePassport } = require('./passport-parser');
+const { sendTravelRequestEmail } = require('./travel-request-email');
 const {
   calculateVisaAmountKobo,
   cleanCallbackUrl,
@@ -57,6 +58,37 @@ function isSuperAdminRequest(body, req) {
 function requireSuperAdmin(body, req) {
   if (isSuperAdminRequest(body, req)) return null;
   return response(403, { error: 'Super admin access is required for this action.' });
+}
+
+function requireAdmin(body, req) {
+  if (adminRoleForCode(requestSuperCode(body, req))) return null;
+  return response(401, { error: 'Admin access is required for this action.' });
+}
+
+function normalizeRequestStatus(value) {
+  const status = String(value || '').trim();
+  return ['New', 'Contacted', 'Quoted', 'Booked', 'Closed'].includes(status) ? status : '';
+}
+
+async function notifyTravelRequest(request) {
+  let notification;
+  try {
+    notification = await sendTravelRequestEmail(request);
+  } catch (error) {
+    notification = {
+      status: 'failed',
+      recipients: ['ifeyinwao@wakanow.com', 'holidays@wakanow.com'],
+      attemptedAt: now(),
+      error: String(error && error.message ? error.message : 'Email delivery failed.').slice(0, 240)
+    };
+  }
+  const updated = await repository.updateRequest(request.id, {
+    metadata: {
+      ...(request.metadata || {}),
+      notification
+    }
+  });
+  return { request: updated || { ...request, metadata: { ...(request.metadata || {}), notification } }, notification };
 }
 
 function userTypeLabel(userType) {
@@ -190,15 +222,51 @@ async function handleApi(method, pathname, body = {}, req = null) {
 
   if (parts[1] === 'requests') {
     if (method === 'GET' && parts.length === 2) {
+      const denied = requireAdmin(body, req);
+      if (denied) return denied;
       return response(200, { requests: await repository.listRequests() });
     }
     if (method === 'POST' && parts.length === 2) {
-      return response(201, { request: await repository.createRequest(body) });
+      const name = String(body.name || '').trim();
+      const email = String(body.email || '').trim().toLowerCase();
+      const phone = String(body.phone || '').trim();
+      if (!name || !email || !phone) {
+        return response(400, { error: 'Name, email and phone are required.' });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return response(400, { error: 'Enter a valid email address.' });
+      }
+      const type = String(body.type || '').trim() === 'Luxury' ? 'Luxury' : 'Travel';
+      const request = await repository.createRequest({
+        ...body,
+        type,
+        name,
+        email,
+        phone,
+        status: 'New',
+        metadata: {
+          source: type === 'Luxury' ? 'concierge' : 'trip-planner',
+          notification: { status: 'pending', attemptedAt: '' }
+        }
+      });
+      const delivered = await notifyTravelRequest(request);
+      return response(201, delivered);
     }
     if (method === 'PATCH' && parts.length === 3) {
-      const updated = await repository.updateRequest(parts[2], body);
+      const denied = requireAdmin(body, req);
+      if (denied) return denied;
+      const status = normalizeRequestStatus(body.status);
+      if (!status) return response(400, { error: 'Choose a valid request status.' });
+      const updated = await repository.updateRequest(parts[2], { status });
       if (!updated) return response(404, { error: 'Request not found' });
       return response(200, { request: updated });
+    }
+    if (method === 'POST' && parts.length === 4 && parts[3] === 'notify') {
+      const denied = requireAdmin(body, req);
+      if (denied) return denied;
+      const request = (await repository.listRequests()).find((item) => item.id === parts[2]);
+      if (!request) return response(404, { error: 'Request not found' });
+      return response(200, await notifyTravelRequest(request));
     }
   }
 

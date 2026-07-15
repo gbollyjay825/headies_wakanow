@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, EligibleApplicant, UploadedFileRecord, UploadGroup, VisaApplication, VisaPricing } from '../api.service';
+import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, UploadGroup, VisaApplication, VisaPricing } from '../api.service';
 
 @Component({
   selector: 'app-admin',
@@ -30,8 +30,8 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, UploadGroup, VisaApp
           <section class="admin-auth" [hidden]="isAdmin">
             <div class="portal-card" style="max-width:460px;margin:70px auto 0;padding:28px">
               <span class="badge">Admin access</span>
-              <h1 style="margin:16px 0 8px;font-size:28px">Visa admin login</h1>
-              <p style="margin:0 0 20px;color:var(--muted)">Sign in to add eligible applicants and review uploaded documents.</p>
+                <h1 style="margin:16px 0 8px;font-size:28px">Travel admin login</h1>
+                <p style="margin:0 0 20px;color:var(--muted)">Sign in to manage travel enquiries, visa applicants and uploaded documents.</p>
               <form #loginForm="ngForm" (ngSubmit)="login(loginForm.valid)">
                 <label class="field"><span class="form-label">Admin passcode</span><input name="passcode" type="password" [(ngModel)]="passcode" required></label>
                 <button class="btn btn-blue btn-block" style="margin-top:18px" type="submit">Open admin dashboard</button>
@@ -43,8 +43,8 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, UploadGroup, VisaApp
           <section class="admin-panel" [hidden]="!isAdmin">
             <div class="admin-title">
               <div>
-                <h1>Road to Toronto | Visa Admin</h1>
-                <p>Preload approved applicant emails, manage login access and review submitted documents.</p>
+                <h1>Road to Toronto | Travel Admin</h1>
+                <p>Manage travel enquiries, visa access and submitted applications in one workspace.</p>
               </div>
               <div class="admin-title__actions">
                 <span class="badge">{{ isSuperAdmin ? 'Super admin' : 'Admin' }}</span>
@@ -54,7 +54,8 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, UploadGroup, VisaApp
 
             <p class="form-status" role="status">{{ dashboardStatus }}</p>
 
-            <div class="stat-grid stat-grid--admin">
+            <div class="stat-grid stat-grid--admin stat-grid--admin-five">
+              <div class="stat-card"><span>Travel requests</span><strong>{{ travelRequests.length }}</strong></div>
               <div class="stat-card"><span>Preloaded emails</span><strong>{{ applicants.length }}</strong></div>
               <div class="stat-card"><span>Completed signups</span><strong>{{ completedSignupCount }}</strong></div>
               <div class="stat-card"><span>Applications</span><strong>{{ applications.length }}</strong></div>
@@ -62,8 +63,11 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, UploadGroup, VisaApp
             </div>
 
             <nav class="admin-tabs" aria-label="Admin sections">
+              <button type="button" [class.is-active]="activeTab === 'requests'" (click)="activeTab = 'requests'">
+                Travel requests <span>{{ travelRequests.length }}</span>
+              </button>
               <button type="button" [class.is-active]="activeTab === 'applications'" (click)="activeTab = 'applications'">
-                Applications <span>{{ applications.length }}</span>
+                Visa applications <span>{{ applications.length }}</span>
               </button>
               <button type="button" [class.is-active]="activeTab === 'setup'" (click)="activeTab = 'setup'">
                 Setup <span>Import</span>
@@ -265,7 +269,143 @@ import { ApiService, EligibleApplicant, UploadedFileRecord, UploadGroup, VisaApp
                 </div>
               </section>
 
-              <div class="admin-grid admin-grid--allowlist" [class.admin-grid--wide-panel]="activeTab === 'allowlist'" [hidden]="activeTab === 'applications'">
+              <section class="admin-card admin-applications-card admin-requests-card" [hidden]="activeTab !== 'requests'">
+                <div class="admin-card__head admin-card__head--row">
+                  <div>
+                    <span class="detail-kicker">Booking desk</span>
+                    <h2>Travel and concierge requests</h2>
+                    <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Every Build my trip and concierge enquiry appears here, with the full itinerary and email-delivery state.</p>
+                  </div>
+                </div>
+
+                <div class="empty-state" *ngIf="!travelRequests.length">No travel requests have been submitted yet.</div>
+
+                <div class="application-toolbar request-toolbar" *ngIf="travelRequests.length">
+                  <label class="field">
+                    <span class="form-label">Search requests</span>
+                    <input name="requestSearch" type="search" [(ngModel)]="requestSearch" placeholder="Name, email, phone, service or reference">
+                  </label>
+                  <label class="field">
+                    <span class="form-label">Request type</span>
+                    <select name="requestTypeFilter" [(ngModel)]="requestTypeFilter">
+                      <option value="all">All requests</option>
+                      <option value="Travel">Build my trip</option>
+                      <option value="Luxury">Concierge</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="form-label">Status</span>
+                    <select name="requestStatusFilter" [(ngModel)]="requestStatusFilter">
+                      <option value="all">All statuses</option>
+                      <option value="New">New</option>
+                      <option value="Contacted">Contacted</option>
+                      <option value="Quoted">Quoted</option>
+                      <option value="Booked">Booked</option>
+                      <option value="Closed">Closed</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="empty-state" *ngIf="travelRequests.length && !filteredTravelRequests.length">No travel requests match the current filters.</div>
+
+                <div class="applications-workbench requests-workbench" *ngIf="filteredTravelRequests.length">
+                  <aside class="application-list-panel" aria-label="Travel requests">
+                    <button
+                      class="application-list-item"
+                      type="button"
+                      *ngFor="let request of filteredTravelRequests"
+                      [class.is-active]="selectedTravelRequest?.id === request.id"
+                      (click)="selectTravelRequest(request)"
+                    >
+                      <span class="application-list-item__top">
+                        <span class="application-list-item__main">
+                          <strong>{{ request.name || request.email }}</strong>
+                          <small>{{ request.email }}</small>
+                          <small *ngIf="request.phone">{{ request.phone }}</small>
+                        </span>
+                        <span class="application-list-item__meta">
+                          <span class="pill" [class.pill--ok]="request.status === 'Booked'" [class.pill--warn]="request.status === 'New'">{{ request.status || 'New' }}</span>
+                          <span class="request-type-label">{{ request.type === 'Luxury' ? 'Concierge' : 'Build trip' }}</span>
+                        </span>
+                      </span>
+                      <span class="request-list-summary">{{ request.summary || 'No summary supplied' }}</span>
+                      <span class="application-list-item__foot">
+                        <span [class.request-email-ok]="requestEmailStatus(request) === 'sent'">{{ requestEmailLabel(request) }}</span>
+                        <span>{{ formatDate(request.createdAt) }}</span>
+                      </span>
+                    </button>
+                  </aside>
+
+                  <ng-container *ngIf="selectedTravelRequest as selectedRequest">
+                    <section class="application-detail-panel request-detail-panel">
+                      <div class="application-detail-head">
+                        <div>
+                          <span class="detail-kicker">{{ selectedRequest.type === 'Luxury' ? 'Concierge request' : 'Build my trip request' }}</span>
+                          <h3>{{ selectedRequest.name || selectedRequest.email }}</h3>
+                          <p>{{ selectedRequest.email }}<span *ngIf="selectedRequest.phone"> · {{ selectedRequest.phone }}</span></p>
+                        </div>
+                        <label class="field application-status-field">
+                          <span class="form-label">Request status</span>
+                          <select [ngModel]="selectedRequest.status || 'New'" (ngModelChange)="updateTravelRequestStatus(selectedRequest, $event)">
+                            <option value="New">New</option>
+                            <option value="Contacted">Contacted</option>
+                            <option value="Quoted">Quoted</option>
+                            <option value="Booked">Booked</option>
+                            <option value="Closed">Closed</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div class="application-badges">
+                        <span class="pill">{{ selectedRequest.type === 'Luxury' ? 'Concierge' : 'Travel plan' }}</span>
+                        <span class="pill" [class.pill--ok]="requestEmailStatus(selectedRequest) === 'sent'" [class.pill--warn]="requestEmailStatus(selectedRequest) !== 'sent'">{{ requestEmailLabel(selectedRequest) }}</span>
+                      </div>
+
+                      <dl class="application-info-grid request-contact-grid">
+                        <div><dt>Phone</dt><dd>{{ selectedRequest.phone || 'Not supplied' }}</dd></div>
+                        <div><dt>Email</dt><dd>{{ selectedRequest.email || 'Not supplied' }}</dd></div>
+                        <div><dt>Reference</dt><dd>{{ selectedRequest.id }}</dd></div>
+                        <div><dt>Submitted</dt><dd>{{ formatDate(selectedRequest.createdAt) }}</dd></div>
+                      </dl>
+
+                      <section class="request-summary-panel">
+                        <span class="form-label">Request summary</span>
+                        <strong>{{ selectedRequest.summary || 'No summary supplied' }}</strong>
+                      </section>
+
+                      <section class="request-itinerary-panel">
+                        <div class="application-documents-panel__head">
+                          <div><h4>Full request details</h4><p>Selections captured from the customer journey.</p></div>
+                        </div>
+                        <dl class="request-detail-list">
+                          <div *ngFor="let detail of selectedRequest.details">
+                            <dt>{{ detail[0] }}</dt>
+                            <dd>{{ detail[1] }}</dd>
+                          </div>
+                        </dl>
+                      </section>
+
+                      <section class="request-email-panel" [class.is-sent]="requestEmailStatus(selectedRequest) === 'sent'">
+                        <div>
+                          <span class="form-label">Team email</span>
+                          <h4>{{ requestEmailLabel(selectedRequest) }}</h4>
+                          <p>{{ requestEmailRecipients(selectedRequest) }}</p>
+                          <p class="request-email-error" *ngIf="selectedRequest.metadata?.notification?.error">{{ selectedRequest.metadata?.notification?.error }}</p>
+                          <small *ngIf="selectedRequest.metadata?.notification?.attemptedAt">Last attempt {{ formatDate(selectedRequest.metadata?.notification?.attemptedAt) }}</small>
+                        </div>
+                        <div class="request-email-actions">
+                          <a class="btn btn-secondary btn-small" [href]="'mailto:' + selectedRequest.email">Email customer</a>
+                          <button class="btn btn-blue btn-small" type="button" (click)="retryTravelRequestEmail(selectedRequest)" [disabled]="requestNotifyWorkingId === selectedRequest.id">
+                            {{ requestNotifyWorkingId === selectedRequest.id ? 'Sending...' : (requestEmailStatus(selectedRequest) === 'sent' ? 'Resend team email' : 'Send team email') }}
+                          </button>
+                        </div>
+                      </section>
+                    </section>
+                  </ng-container>
+                </div>
+              </section>
+
+              <div class="admin-grid admin-grid--allowlist" [class.admin-grid--wide-panel]="activeTab === 'allowlist'" [hidden]="activeTab === 'applications' || activeTab === 'requests'">
                 <aside class="admin-card admin-card--compact" [hidden]="activeTab !== 'setup'">
                   <div class="admin-card__head">
                     <h2>Preload one email</h2>
@@ -388,13 +528,19 @@ export class AdminComponent implements OnInit {
   pricingWorking = false;
   adminRole = (sessionStorage.getItem('headiesVisaAdminRole') || '') as '' | 'admin' | 'super';
   isAdmin = Boolean(this.adminRole);
+  travelRequests: TravelRequest[] = [];
   applicants: EligibleApplicant[] = [];
   applications: VisaApplication[] = [];
   pricing: VisaPricing = { basic: 745000, premium: 745000, staff: 0 };
   pricingModel = { basic: 745000, premium: 745000 };
   importFile: File | null = null;
   selectedImportFileName = '';
-  activeTab: 'applications' | 'setup' | 'allowlist' = 'applications';
+  activeTab: 'requests' | 'applications' | 'setup' | 'allowlist' = 'requests';
+  requestSearch = '';
+  requestTypeFilter: 'all' | 'Travel' | 'Luxury' = 'all';
+  requestStatusFilter = 'all';
+  selectedTravelRequestId = '';
+  requestNotifyWorkingId = '';
   applicationSearch = '';
   allowlistSearch = '';
   applicationPaymentFilter: 'all' | NonNullable<VisaApplication['paymentStatus']> = 'all';
@@ -452,6 +598,30 @@ export class AdminComponent implements OnInit {
     });
   }
 
+  get filteredTravelRequests(): TravelRequest[] {
+    const query = this.requestSearch.trim().toLowerCase();
+    return this.travelRequests.filter((request) => {
+      if (this.requestTypeFilter !== 'all' && request.type !== this.requestTypeFilter) return false;
+      if (this.requestStatusFilter !== 'all' && (request.status || 'New') !== this.requestStatusFilter) return false;
+      if (!query) return true;
+      const details = (request.details || []).flatMap((detail) => detail || []);
+      return [
+        request.id,
+        request.name,
+        request.email,
+        request.phone,
+        request.type,
+        request.summary,
+        request.status,
+        ...details
+      ].some((value) => String(value || '').toLowerCase().includes(query));
+    });
+  }
+
+  get selectedTravelRequest(): TravelRequest | null {
+    return this.filteredTravelRequests.find((request) => request.id === this.selectedTravelRequestId) || this.filteredTravelRequests[0] || null;
+  }
+
   get filteredApplicants(): EligibleApplicant[] {
     const query = this.allowlistSearch.trim().toLowerCase();
     if (!query) return this.applicants;
@@ -507,12 +677,18 @@ export class AdminComponent implements OnInit {
   async loadDashboard(): Promise<void> {
     this.dashboardStatus = 'Loading dashboard...';
     try {
-      const [eligible, apps, pricing] = await Promise.all([
+      const [requests, eligible, apps, pricing] = await Promise.all([
+        this.api.listTravelRequests(this.superAdminCode),
         this.api.listEligible(),
         this.api.listApplications(),
         this.api.getVisaPricing()
       ]);
+      const previousRequestSelection = this.selectedTravelRequestId;
       const previousSelection = this.selectedApplicationId;
+      this.travelRequests = requests.requests.sort((a, b) => String(b.createdAt || b.updatedAt).localeCompare(String(a.createdAt || a.updatedAt)));
+      this.selectedTravelRequestId = this.travelRequests.some((request) => request.id === previousRequestSelection)
+        ? previousRequestSelection
+        : (this.travelRequests[0]?.id || '');
       this.applicants = eligible.applicants;
       this.applications = apps.applications.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
       this.selectedApplicationId = this.applications.some((app) => app.id === previousSelection) ? previousSelection : (this.applications[0]?.id || '');
@@ -532,6 +708,62 @@ export class AdminComponent implements OnInit {
 
   selectApplication(app: VisaApplication): void {
     this.selectedApplicationId = app.id;
+  }
+
+  selectTravelRequest(request: TravelRequest): void {
+    this.selectedTravelRequestId = request.id || '';
+  }
+
+  requestEmailStatus(request: TravelRequest): string {
+    return request.metadata?.notification?.status || 'not_sent';
+  }
+
+  requestEmailLabel(request: TravelRequest): string {
+    return {
+      sent: 'Team email sent',
+      pending: 'Team email pending',
+      failed: 'Team email failed',
+      not_configured: 'Email setup required',
+      not_sent: 'No email record'
+    }[this.requestEmailStatus(request)] || 'Email status unknown';
+  }
+
+  requestEmailRecipients(request: TravelRequest): string {
+    const recipients = request.metadata?.notification?.recipients || [];
+    return recipients.length
+      ? `Recipients: ${recipients.join(' and ')}`
+      : 'Recipients: ifeyinwao@wakanow.com and holidays@wakanow.com';
+  }
+
+  async updateTravelRequestStatus(request: TravelRequest, status: string): Promise<void> {
+    if (!request.id) return;
+    const previous = request.status;
+    request.status = status;
+    try {
+      const result = await this.api.updateTravelRequest(request.id, status, this.superAdminCode);
+      this.travelRequests = this.travelRequests.map((item) => item.id === request.id ? result.request : item);
+      this.dashboardStatus = 'Travel request status updated.';
+    } catch (error) {
+      request.status = previous;
+      this.dashboardStatus = error instanceof Error ? error.message : 'Could not update the travel request.';
+    }
+  }
+
+  async retryTravelRequestEmail(request: TravelRequest): Promise<void> {
+    if (!request.id || this.requestNotifyWorkingId) return;
+    this.requestNotifyWorkingId = request.id;
+    this.dashboardStatus = 'Sending the request to the travel team...';
+    try {
+      const result = await this.api.notifyTravelRequest(request.id, this.superAdminCode);
+      this.travelRequests = this.travelRequests.map((item) => item.id === request.id ? result.request : item);
+      this.dashboardStatus = result.notification.status === 'sent'
+        ? 'Travel request emailed to both team addresses.'
+        : (result.notification.error || 'The request is saved, but the team email could not be sent.');
+    } catch (error) {
+      this.dashboardStatus = error instanceof Error ? error.message : 'Could not send the team email.';
+    } finally {
+      this.requestNotifyWorkingId = '';
+    }
   }
 
   userTypeLabel(userType: EligibleApplicant['userType'] | VisaApplication['userType']): string {

@@ -14,6 +14,23 @@ export interface TravelRequest {
   summary: string;
   status?: string;
   details: DetailPair[];
+  metadata?: {
+    source?: string;
+    notification?: TravelRequestNotification;
+    [key: string]: unknown;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TravelRequestNotification {
+  status: 'pending' | 'sent' | 'failed' | 'not_configured';
+  recipients?: string[];
+  provider?: string;
+  messageId?: string;
+  attemptedAt?: string;
+  sentAt?: string;
+  error?: string;
 }
 
 export interface EligibleApplicant {
@@ -144,6 +161,28 @@ export class ApiService {
     return this.request('/api/requests', {
       method: 'POST',
       body: JSON.stringify(record)
+    });
+  }
+
+  listTravelRequests(adminCode: string): Promise<{ requests: TravelRequest[] }> {
+    return this.request('/api/requests', {
+      headers: this.superHeaders(adminCode)
+    });
+  }
+
+  updateTravelRequest(id: string, status: string, adminCode: string): Promise<{ request: TravelRequest }> {
+    return this.request(`/api/requests/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this.superHeaders(adminCode),
+      body: JSON.stringify({ status })
+    });
+  }
+
+  notifyTravelRequest(id: string, adminCode: string): Promise<{ request: TravelRequest; notification: TravelRequestNotification }> {
+    return this.request(`/api/requests/${encodeURIComponent(id)}/notify`, {
+      method: 'POST',
+      headers: this.superHeaders(adminCode),
+      body: JSON.stringify({})
     });
   }
 
