@@ -144,7 +144,8 @@ function priceForUserType(pricing, userType) {
 }
 
 const DOC_FIELD_LABELS = {
-  applicationForm: 'Completed Canada visa application form',
+  applicationForm: 'Completed IMM 5257 application form',
+  familyInformationForm: 'Completed IMM 5645 family information form',
   resume: 'Updated CV / resume',
   passport: 'Valid passport',
   previousVisas: 'Previous and current visas',
@@ -162,7 +163,7 @@ const DOC_FIELD_LABELS = {
 
 function requiredDocFieldsFor(category) {
   const value = String(category || '').trim();
-  const fields = ['applicationForm', 'resume', 'passport', 'previousVisas', 'bankStatements', 'taxClearance'];
+  const fields = ['applicationForm', 'familyInformationForm', 'resume', 'passport', 'previousVisas', 'bankStatements', 'taxClearance'];
   if (value === 'employed' || value === 'employed-business-owner') {
     fields.push('employmentLetter', 'paySlips', 'staffId', 'introductionLetter');
   }

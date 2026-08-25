@@ -12,6 +12,7 @@ process.env.WKN_STORE_FILE = storeFile;
 
 const requiredFields = [
   'applicationForm',
+  'familyInformationForm',
   'resume',
   'passport',
   'previousVisas',
@@ -108,6 +109,18 @@ fs.writeFileSync(storeFile, JSON.stringify({
 const { handleApi } = require('../backend/api');
 
 after(() => fs.rmSync(testDir, { recursive: true, force: true }));
+
+test('submission requires the IMM 5645 family information form', async () => {
+  const result = await handleApi('POST', '/api/visa/applications', {
+    ...staffApplication,
+    uploads: staffApplication.uploads.filter((upload) => upload.field !== 'familyInformationForm'),
+    status: 'Submitted',
+    reviewConfirmed: true
+  });
+
+  assert.equal(result.status, 400);
+  assert.match(result.data.error, /IMM 5645 family information form/i);
+});
 
 test('active staff applicant submits without card payment and records a waiver', async () => {
   const result = await handleApi('POST', '/api/visa/applications', {

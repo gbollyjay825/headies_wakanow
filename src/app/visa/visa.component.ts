@@ -225,25 +225,29 @@ interface UploadDoc {
                   <details class="visa-templates" open>
                     <summary class="visa-templates__summary">
                       <span class="visa-template-filetype" aria-hidden="true">PDF</span>
-                      <span class="visa-templates__copy"><strong>Required visa forms and checklist</strong><small>Download these official PDFs, complete the applicable forms, then upload the finished copies below.</small></span>
+                      <span class="visa-templates__copy"><strong>Official visa forms and checklist</strong><small>Download the IRCC PDFs, open them in Adobe Acrobat Reader on a computer, then upload the completed copies below.</small></span>
                       <span class="visa-templates__count">3 downloads</span>
                     </summary>
                     <div class="visa-template-list">
-                      <a class="visa-template-link" href="/assets/visa-templates/canada-temporary-resident-visa-checklist.pdf" download="canada-temporary-resident-visa-checklist.pdf">
+                      <a class="visa-template-link" href="/assets/visa-templates/canada-temporary-resident-visa-checklist.pdf" download="imm5484e-temporary-resident-visa-checklist.pdf">
                         <span class="visa-template-filetype" aria-hidden="true">PDF</span>
-                        <span class="visa-template-copy"><strong>Canada visa checklist</strong><small>Temporary resident visa · 2 pages</small></span>
+                        <span class="visa-template-copy"><strong>Temporary resident visa checklist</strong><small>IMM 5484 · updated May 2026 · 2 pages</small></span>
                         <span class="visa-template-action">Download PDF</span>
                       </a>
-                      <a class="visa-template-link" href="/assets/visa-templates/imm5257e-visitor-visa-application.pdf" download="imm5257e-visitor-visa-application.pdf">
+                      <a class="visa-template-link" href="/assets/visa-templates/imm5257e-visitor-visa-application.pdf" download="imm5257e-application-for-visitor-visa.pdf">
                         <span class="visa-template-filetype" aria-hidden="true">PDF</span>
-                        <span class="visa-template-copy"><strong>IMM 5257 application form</strong><small>Visitor visa application · 5 pages</small></span>
+                        <span class="visa-template-copy"><strong>IMM 5257 application form</strong><small>Updated September 2023 · interactive PDF</small></span>
                         <span class="visa-template-action">Download PDF</span>
                       </a>
                       <a class="visa-template-link" href="/assets/visa-templates/imm5645e-family-information.pdf" download="imm5645e-family-information.pdf">
                         <span class="visa-template-filetype" aria-hidden="true">PDF</span>
-                        <span class="visa-template-copy"><strong>IMM 5645 family information</strong><small>Family information form · 2 pages</small></span>
+                        <span class="visa-template-copy"><strong>IMM 5645 family information</strong><small>Updated January 2021 · 2 pages</small></span>
                         <span class="visa-template-action">Download PDF</span>
                       </a>
+                    </div>
+                    <div class="visa-templates__notice">
+                      <div><strong>Open the saved files in Adobe Acrobat Reader</strong><span>Upload IMM 5257 and IMM 5645 in their matching slots below. IMM 5484 is an optional preparation checklist. Interactive forms may show a “Please wait” page in a browser or phone PDF viewer.</span></div>
+                      <a href="https://www.canada.ca/en/immigration-refugees-citizenship/services/application/application-forms-guides.html" target="_blank" rel="noopener noreferrer">Confirm latest versions on Canada.ca</a>
                     </div>
                   </details>
 
@@ -392,7 +396,8 @@ export class VisaComponent implements OnInit {
   signupModel = { name: '', email: '', phone: '', accessCode: '', confirmAccessCode: '', category: '', notes: '' };
 
   requirements = [
-    'Completed Canada visa application form',
+    'Completed IMM 5257 visitor visa application form',
+    'Completed IMM 5645 family information form',
     'Updated CV or resume',
     'Valid passport with minimum 6 months validity',
     'Previous and current visas showing travel history',
@@ -403,7 +408,9 @@ export class VisaComponent implements OnInit {
   ];
 
   docs: UploadDoc[] = [
-    { field: 'applicationForm', document: 'Completed Canada visa application form', required: true, files: [] },
+    { field: 'applicationForm', document: 'Completed IMM 5257 application form', required: true, files: [] },
+    { field: 'familyInformationForm', document: 'Completed IMM 5645 family information form', required: true, files: [] },
+    { field: 'visaChecklist', document: 'Completed IMM 5484 visa checklist', required: false, files: [] },
     { field: 'resume', document: 'Updated CV / resume', required: true, files: [] },
     { field: 'passport', document: 'Valid passport', required: true, files: [] },
     { field: 'previousVisas', document: 'Previous and current visas', required: true, files: [] },
