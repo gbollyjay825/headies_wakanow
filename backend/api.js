@@ -12,6 +12,7 @@ const {
 
 const ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || 'HEADIES2026';
 const SUPER_ADMIN_PASSCODE = process.env.SUPER_ADMIN_PASSCODE || 'HEADIES2027';
+const VISA_APPLICATION_STATUSES = ['Draft', 'Submitted', 'In review', 'Missing documents', 'Approved', 'Declined'];
 
 function response(status, data) {
   return { status, data };
@@ -68,6 +69,11 @@ function requireAdmin(body, req) {
 function normalizeRequestStatus(value) {
   const status = String(value || '').trim();
   return ['New', 'Contacted', 'Quoted', 'Booked', 'Closed'].includes(status) ? status : '';
+}
+
+function normalizeVisaApplicationStatus(value) {
+  const status = String(value || '').trim();
+  return VISA_APPLICATION_STATUSES.includes(status) ? status : '';
 }
 
 async function notifyTravelRequest(request) {
@@ -512,6 +518,8 @@ async function handleApi(method, pathname, body = {}, req = null) {
 
   if (parts[1] === 'visa' && parts[2] === 'applications') {
     if (method === 'GET' && parts.length === 3) {
+      const denied = requireSuperAdmin(body, req);
+      if (denied) return denied;
       return response(200, { applications: await repository.listApplications() });
     }
     if (method === 'GET' && parts.length === 4) {
@@ -540,6 +548,8 @@ async function handleApi(method, pathname, body = {}, req = null) {
       }
     }
     if (method === 'GET' && parts.length === 6 && parts[4] === 'documents') {
+      const denied = requireSuperAdmin(body, req);
+      if (denied) return denied;
       try {
         const document = await repository.getApplicationDocument(parts[3], parts[5]);
         if (!document) return response(404, { error: 'Document not found' });
@@ -550,6 +560,11 @@ async function handleApi(method, pathname, body = {}, req = null) {
     }
     if (method === 'POST' && parts.length === 3) {
       const nextBody = { ...body };
+      if (nextBody.status != null) {
+        const status = normalizeVisaApplicationStatus(nextBody.status);
+        if (!status) return response(400, { error: 'Choose a valid visa application status.' });
+        nextBody.status = status;
+      }
       if (nextBody.status === 'Submitted') {
         const applicationId = nextBody.id || nextBody.applicantId;
         const existing = applicationId ? await repository.getApplication(applicationId) : null;
@@ -575,6 +590,11 @@ async function handleApi(method, pathname, body = {}, req = null) {
     }
     if (method === 'PATCH' && parts.length === 4) {
       let nextFields = { ...body };
+      const denied = requireSuperAdmin(body, req);
+      if (denied) return denied;
+      const status = normalizeVisaApplicationStatus(body.status);
+      if (!status) return response(400, { error: 'Choose a valid visa application status.' });
+      nextFields.status = status;
       if (body.status === 'Submitted') {
         const existing = await repository.getApplication(parts[3]);
         if (!existing) return response(404, { error: 'Application not found' });

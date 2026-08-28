@@ -254,8 +254,10 @@ export class ApiService {
     });
   }
 
-  listApplications(): Promise<{ applications: VisaApplication[] }> {
-    return this.request('/api/visa/applications');
+  listApplications(superAdminCode: string): Promise<{ applications: VisaApplication[] }> {
+    return this.request('/api/visa/applications', {
+      headers: this.superHeaders(superAdminCode)
+    });
   }
 
   getApplication(id: string): Promise<{ application: VisaApplication }> {
@@ -279,13 +281,22 @@ export class ApiService {
     });
   }
 
-  documentDownloadUrl(applicationId: string, fileId: string): string {
-    return `/api/visa/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(fileId)}`;
+  async downloadApplicationDocument(applicationId: string, fileId: string, superAdminCode: string): Promise<Blob> {
+    const response = await fetch(`/api/visa/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(fileId)}`, {
+      headers: this.superHeaders(superAdminCode)
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const message = typeof data.error === 'string' ? data.error : 'Could not download the document.';
+      throw new Error(message);
+    }
+    return response.blob();
   }
 
-  updateApplication(id: string, fields: Partial<VisaApplication>): Promise<{ application: VisaApplication }> {
+  updateApplication(id: string, fields: Partial<VisaApplication>, superAdminCode: string): Promise<{ application: VisaApplication }> {
     return this.request(`/api/visa/applications/${encodeURIComponent(id)}`, {
       method: 'PATCH',
+      headers: this.superHeaders(superAdminCode),
       body: JSON.stringify(fields)
     });
   }

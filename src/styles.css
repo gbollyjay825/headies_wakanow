@@ -1056,7 +1056,7 @@
 
 .application-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 230px) minmax(170px, 210px);
   gap: 12px;
   padding: 0 22px 18px;
   border-bottom: 1px solid var(--line);
@@ -1168,6 +1168,16 @@
   grid-template-columns: minmax(0, 1fr) minmax(190px, 240px);
   gap: 18px;
   align-items: start;
+}
+
+.application-detail-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.application-detail-actions .btn,
+.application-detail-actions .application-status-field {
+  width: 100%;
 }
 
 .detail-kicker {

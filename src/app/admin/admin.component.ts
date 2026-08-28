@@ -58,15 +58,15 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
               <div class="stat-card"><span>Travel requests</span><strong>{{ travelRequests.length }}</strong></div>
               <div class="stat-card"><span>Preloaded emails</span><strong>{{ applicants.length }}</strong></div>
               <div class="stat-card"><span>Completed signups</span><strong>{{ completedSignupCount }}</strong></div>
-              <div class="stat-card"><span>Applications</span><strong>{{ applications.length }}</strong></div>
-              <div class="stat-card"><span>Uploaded documents</span><strong>{{ documentCount }}</strong></div>
+              <div class="stat-card" *ngIf="isSuperAdmin"><span>Submitted applications</span><strong>{{ submittedApplications.length }}</strong></div>
+              <div class="stat-card" *ngIf="isSuperAdmin"><span>Uploaded documents</span><strong>{{ documentCount }}</strong></div>
             </div>
 
             <nav class="admin-tabs" aria-label="Admin sections">
               <button type="button" [class.is-active]="activeTab === 'requests'" (click)="activeTab = 'requests'">
                 Travel requests <span>{{ travelRequests.length }}</span>
               </button>
-              <button type="button" [class.is-active]="activeTab === 'applications'" (click)="activeTab = 'applications'">
+              <button type="button" *ngIf="isSuperAdmin" [class.is-active]="activeTab === 'applications'" (click)="activeTab = 'applications'">
                 Visa applications <span>{{ applications.length }}</span>
               </button>
               <button type="button" [class.is-active]="activeTab === 'setup'" (click)="activeTab = 'setup'">
@@ -119,8 +119,9 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                 <div class="admin-card__head admin-card__head--row">
                   <div>
                     <h2>Visa applications and documents</h2>
-                    <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Review submitted applications and download uploaded documents without scanning a crowded table.</p>
+                    <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Superadmin workspace for reviewing status, exporting submitted applications and downloading uploaded documents.</p>
                   </div>
+                  <button class="btn btn-blue btn-small" type="button" (click)="downloadSubmittedApplications()" [disabled]="!submittedApplications.length">Download submitted CSV</button>
                 </div>
 
                 <div class="empty-state" *ngIf="!applications.length">No submitted visa applications yet.</div>
@@ -129,6 +130,19 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                   <label class="field">
                     <span class="form-label">Search applications</span>
                     <input name="applicationSearch" type="search" [(ngModel)]="applicationSearch" placeholder="Name, email, phone, reference or category">
+                  </label>
+                  <label class="field">
+                    <span class="form-label">Application status</span>
+                    <select name="applicationStatusFilter" [(ngModel)]="applicationStatusFilter">
+                      <option value="submitted">Submitted and under review</option>
+                      <option value="all">All including drafts</option>
+                      <option value="Submitted">Submitted</option>
+                      <option value="In review">In review</option>
+                      <option value="Missing documents">Missing documents</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Declined">Declined</option>
+                      <option value="Draft">Draft</option>
+                    </select>
                   </label>
                   <label class="field">
                     <span class="form-label">Payment</span>
@@ -181,17 +195,20 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                           <h3>{{ selectedApp.name || selectedApp.email }}</h3>
                           <p>{{ selectedApp.email }}<span *ngIf="selectedApp.phone"> · {{ selectedApp.phone }}</span></p>
                         </div>
-                        <label class="field application-status-field">
-                          <span class="form-label">Review status</span>
-                          <select [ngModel]="selectedApp.status" (ngModelChange)="updateApplicationStatus(selectedApp, $event)">
-                            <option value="Draft">Draft</option>
-                            <option value="Submitted">Submitted</option>
-                            <option value="In review">In review</option>
-                            <option value="Missing documents">Missing documents</option>
-                            <option value="Approved">Approved</option>
-                            <option value="Declined">Declined</option>
-                          </select>
-                        </label>
+                        <div class="application-detail-actions">
+                          <button class="btn btn-secondary btn-small" type="button" (click)="downloadApplication(selectedApp)">Download application CSV</button>
+                          <label class="field application-status-field">
+                            <span class="form-label">Review status</span>
+                            <select [ngModel]="selectedApp.status" (ngModelChange)="updateApplicationStatus(selectedApp, $event)">
+                              <option value="Draft">Draft</option>
+                              <option value="Submitted">Submitted</option>
+                              <option value="In review">In review</option>
+                              <option value="Missing documents">Missing documents</option>
+                              <option value="Approved">Approved</option>
+                              <option value="Declined">Declined</option>
+                            </select>
+                          </label>
+                        </div>
                       </div>
 
                       <div class="application-badges">
@@ -259,7 +276,9 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                                 <strong>{{ file.name }}</strong>
                                 <span>{{ file.type || 'Document' }} · {{ fileSize(file.size) }}</span>
                               </div>
-                              <a class="btn btn-secondary btn-small" *ngIf="file.id" [href]="docUrl(selectedApp, file)">Download</a>
+                              <button class="btn btn-secondary btn-small" type="button" *ngIf="file.id" (click)="downloadDocument(selectedApp, file)" [disabled]="documentDownloadWorkingId === file.id">
+                                {{ documentDownloadWorkingId === file.id ? 'Downloading...' : 'Download document' }}
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -543,8 +562,10 @@ export class AdminComponent implements OnInit {
   requestNotifyWorkingId = '';
   applicationSearch = '';
   allowlistSearch = '';
+  applicationStatusFilter = 'submitted';
   applicationPaymentFilter: 'all' | NonNullable<VisaApplication['paymentStatus']> = 'all';
   selectedApplicationId = '';
+  documentDownloadWorkingId = '';
 
   newApplicant: Partial<EligibleApplicant> = {
     name: '',
@@ -560,6 +581,7 @@ export class AdminComponent implements OnInit {
   constructor(private api: ApiService) {}
 
   ngOnInit(): void {
+    if (this.isSuperAdmin) this.activeTab = 'applications';
     if (this.isAdmin) void this.loadDashboard();
   }
 
@@ -569,6 +591,10 @@ export class AdminComponent implements OnInit {
 
   get completedSignupCount(): number {
     return this.applicants.filter((applicant) => Boolean(applicant.signupCompletedAt)).length;
+  }
+
+  get submittedApplications(): VisaApplication[] {
+    return this.applications.filter((application) => application.status !== 'Draft');
   }
 
   get isSuperAdmin(): boolean {
@@ -583,6 +609,8 @@ export class AdminComponent implements OnInit {
     const query = this.applicationSearch.trim().toLowerCase();
     return this.applications.filter((app) => {
       const paymentStatus = app.paymentStatus || 'Unpaid';
+      if (this.applicationStatusFilter === 'submitted' && app.status === 'Draft') return false;
+      if (this.applicationStatusFilter !== 'submitted' && this.applicationStatusFilter !== 'all' && app.status !== this.applicationStatusFilter) return false;
       if (this.applicationPaymentFilter !== 'all' && paymentStatus !== this.applicationPaymentFilter) return false;
       if (!query) return true;
       return [
@@ -658,6 +686,7 @@ export class AdminComponent implements OnInit {
       sessionStorage.setItem('headiesVisaAdminCode', this.passcode);
       this.adminRole = role;
       this.isAdmin = true;
+      this.activeTab = role === 'super' ? 'applications' : 'requests';
       this.loginStatus = '';
       this.passcode = '';
       await this.loadDashboard();
@@ -672,15 +701,19 @@ export class AdminComponent implements OnInit {
     sessionStorage.removeItem('headiesVisaAdminCode');
     this.adminRole = '';
     this.isAdmin = false;
+    this.activeTab = 'requests';
   }
 
   async loadDashboard(): Promise<void> {
     this.dashboardStatus = 'Loading dashboard...';
     try {
+      const applicationsRequest = this.isSuperAdmin
+        ? this.api.listApplications(this.superAdminCode)
+        : Promise.resolve({ applications: [] as VisaApplication[] });
       const [requests, eligible, apps, pricing] = await Promise.all([
         this.api.listTravelRequests(this.superAdminCode),
         this.api.listEligible(),
-        this.api.listApplications(),
+        applicationsRequest,
         this.api.getVisaPricing()
       ]);
       const previousRequestSelection = this.selectedTravelRequestId;
@@ -702,8 +735,19 @@ export class AdminComponent implements OnInit {
     }
   }
 
-  docUrl(app: VisaApplication, file: UploadedFileRecord): string {
-    return this.api.documentDownloadUrl(app.id, String(file.id));
+  async downloadDocument(app: VisaApplication, file: UploadedFileRecord): Promise<void> {
+    if (!this.isSuperAdmin || !file.id || this.documentDownloadWorkingId) return;
+    this.documentDownloadWorkingId = file.id;
+    this.dashboardStatus = `Downloading ${file.name}...`;
+    try {
+      const blob = await this.api.downloadApplicationDocument(app.id, file.id, this.superAdminCode);
+      this.downloadBlob(file.name, blob);
+      this.dashboardStatus = `${file.name} downloaded.`;
+    } catch (error) {
+      this.dashboardStatus = error instanceof Error ? error.message : 'Could not download the document.';
+    } finally {
+      this.documentDownloadWorkingId = '';
+    }
   }
 
   selectApplication(app: VisaApplication): void {
@@ -831,10 +875,14 @@ export class AdminComponent implements OnInit {
   }
 
   async updateApplicationStatus(app: VisaApplication, status: VisaApplication['status']): Promise<void> {
+    if (!this.isSuperAdmin) {
+      this.dashboardStatus = 'Superadmin access is required to update visa application status.';
+      return;
+    }
     const previous = app.status;
     app.status = status;
     try {
-      await this.api.updateApplication(app.id, { status });
+      await this.api.updateApplication(app.id, { status }, this.superAdminCode);
       await this.loadDashboard();
     } catch (error) {
       app.status = previous;
@@ -964,12 +1012,89 @@ export class AdminComponent implements OnInit {
     this.downloadText('headies-visa-eligible-applicants.csv', rows.map((row) => row.map(this.csvEscape).join(',')).join('\n'));
   }
 
-  csvEscape(value: string): string {
-    return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  downloadSubmittedApplications(): void {
+    if (!this.isSuperAdmin || !this.submittedApplications.length) {
+      this.dashboardStatus = 'There are no submitted visa applications to download.';
+      return;
+    }
+    this.downloadApplicationsCsv('headies-visa-submitted-applications.csv', this.submittedApplications);
+    this.dashboardStatus = `${this.submittedApplications.length} submitted application${this.submittedApplications.length === 1 ? '' : 's'} downloaded.`;
   }
 
-  downloadText(filename: string, text: string): void {
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  downloadApplication(application: VisaApplication): void {
+    if (!this.isSuperAdmin) return;
+    const name = String(application.name || application.id || 'visa-application')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'visa-application';
+    this.downloadApplicationsCsv(`${name}-visa-application.csv`, [application]);
+    this.dashboardStatus = `${application.name || application.email || 'Visa application'} downloaded.`;
+  }
+
+  downloadApplicationsCsv(filename: string, applications: VisaApplication[]): void {
+    const headers = [
+      'applicationId', 'applicantId', 'name', 'email', 'phone', 'applicants', 'applicantCategory', 'userType',
+      'applicationStatus', 'paymentStatus', 'paymentReference', 'paymentAmountMinorUnits', 'paymentCurrency',
+      'passportNumber', 'passportName', 'passportNationality', 'passportDateOfBirth', 'passportSex', 'passportIssuingCountry',
+      'passportExpiry', 'passportValidation', 'travelDate', 'travelHistory', 'role', 'salary', 'employmentLength', 'notes', 'fee',
+      'uploadedDocumentCount', 'uploadedDocuments', 'uploadedFileNames', 'createdAt', 'updatedAt', 'reviewedAt'
+    ];
+    const rows = applications.map((application) => {
+      const uploads = (application.uploads || []).filter((upload) => Boolean(upload.files?.length));
+      const uploadedDocuments = uploads.map((upload) => upload.document).join(' | ');
+      const uploadedFileNames = uploads.flatMap((upload) => upload.files.map((file) => `${upload.document}: ${file.name}`)).join(' | ');
+      return [
+        application.id,
+        application.applicantId,
+        application.name,
+        application.email,
+        application.phone,
+        application.applicants,
+        application.applicantCategory,
+        application.userType || 'basic',
+        application.status,
+        application.paymentStatus || 'Unpaid',
+        application.paymentReference || '',
+        application.paymentAmount || 0,
+        application.paymentCurrency || 'NGN',
+        application.passportDetails?.parsed?.passportNumber || '',
+        this.adminPassportName(application),
+        application.passportDetails?.parsed?.nationality || '',
+        application.passportDetails?.parsed?.dateOfBirth || '',
+        application.passportDetails?.parsed?.sex || '',
+        application.passportDetails?.parsed?.issuingCountry || '',
+        application.passportExpiry,
+        application.passportDetails?.validation?.reason || '',
+        application.travelDate,
+        application.travelHistory,
+        application.role,
+        application.salary,
+        application.employmentLength,
+        application.notes,
+        application.fee,
+        this.countFiles(application),
+        uploadedDocuments,
+        uploadedFileNames,
+        application.createdAt || '',
+        application.updatedAt || '',
+        application.reviewedAt || ''
+      ];
+    });
+    this.downloadText(filename, [headers, ...rows].map((row) => row.map(this.csvEscape).join(',')).join('\n'), 'text/csv;charset=utf-8');
+  }
+
+  csvEscape(value: unknown): string {
+    let text = String(value ?? '');
+    if (/^[=+\-@]/.test(text)) text = `'${text}`;
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }
+
+  downloadText(filename: string, text: string, type = 'text/plain;charset=utf-8'): void {
+    this.downloadBlob(filename, new Blob([text], { type }));
+  }
+
+  downloadBlob(filename: string, blob: Blob): void {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

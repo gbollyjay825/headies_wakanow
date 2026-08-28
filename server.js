@@ -40,7 +40,9 @@ function sendBinaryFile(res, status, file) {
   res.writeHead(status, {
     'content-type': file.type || 'application/octet-stream',
     'content-length': file.data.length,
-    'content-disposition': `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(String(file.name || 'document'))}`
+    'content-disposition': `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(String(file.name || 'document'))}`,
+    'cache-control': 'private, no-store',
+    'x-content-type-options': 'nosniff'
   });
   res.end(file.data);
 }

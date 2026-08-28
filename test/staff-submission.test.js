@@ -8,6 +8,7 @@ const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'headies-staff-submit-'));
 const storeFile = path.join(testDir, 'store.json');
 
 delete process.env.DATABASE_URL;
+process.env.SUPER_ADMIN_PASSCODE = 'TEST-SUPER';
 process.env.WKN_STORE_FILE = storeFile;
 
 const requiredFields = [
@@ -107,6 +108,7 @@ fs.writeFileSync(storeFile, JSON.stringify({
 }, null, 2));
 
 const { handleApi } = require('../backend/api');
+const superAdminRequest = { headers: { 'x-super-admin-code': 'TEST-SUPER' } };
 
 after(() => fs.rmSync(testDir, { recursive: true, force: true }));
 
@@ -156,7 +158,8 @@ test('staff waiver also applies to the application status update route', async (
   const result = await handleApi(
     'PATCH',
     '/api/visa/applications/staff-patch-1',
-    { status: 'Submitted' }
+    { status: 'Submitted' },
+    superAdminRequest
   );
 
   assert.equal(result.status, 200);

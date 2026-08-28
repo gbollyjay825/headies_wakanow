@@ -39,6 +39,8 @@ module.exports = async function handler(req, res) {
       const safeName = String(file.name || 'document').replace(/[^\x20-\x7E]|["\\]/g, '_');
       res.setHeader('content-type', file.type || 'application/octet-stream');
       res.setHeader('content-disposition', `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(String(file.name || 'document'))}`);
+      res.setHeader('cache-control', 'private, no-store');
+      res.setHeader('x-content-type-options', 'nosniff');
       res.status(result.status).send(file.data);
       return;
     }
