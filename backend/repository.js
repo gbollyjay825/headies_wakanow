@@ -23,19 +23,30 @@ function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
-const USER_TYPES = new Set(['basic', 'premium', 'staff']);
+const USER_TYPES = new Set(['basic', 'premium', 'staff', 'nominee']);
 const VISA_PRICE_KEYS = {
   basic: 'visa_basic_fee_naira',
-  premium: 'visa_premium_fee_naira'
+  premium: 'visa_premium_fee_naira',
+  nominee: 'visa_nominee_fee_naira'
 };
 const DEFAULT_VISA_PRICING = {
   basic: Number(process.env.VISA_FEE_NAIRA || 745000),
-  premium: Number(process.env.VISA_PREMIUM_FEE_NAIRA || process.env.VISA_FEE_NAIRA || 745000)
+  premium: Number(process.env.VISA_PREMIUM_FEE_NAIRA || process.env.VISA_FEE_NAIRA || 745000),
+  nominee: Number(process.env.VISA_NOMINEE_FEE_NAIRA || 350000)
 };
 
 function normalizeUserType(value) {
-  const type = String(value || '').trim().toLowerCase();
+  const input = String(value || '').trim().toLowerCase();
+  const type = input === 'nominees' ? 'nominee' : input;
   return USER_TYPES.has(type) ? type : 'basic';
+}
+
+function feeLabelForUserType(value) {
+  const userType = normalizeUserType(value);
+  if (userType === 'staff') return 'Staff visa package: no payment required';
+  if (userType === 'nominee') return 'Nominees visa only: visa fee included; admin processing and Headies ticket fees not included';
+  const label = userType === 'premium' ? 'Premium' : 'Basic';
+  return `${label} visa package: visa fee included, admin processing fee included, Headies ticket fee included`;
 }
 
 function recordUserType(record, fallback = 'basic') {
@@ -348,7 +359,7 @@ async function upsertEligibleRecordsPg(records, options = {}) {
     }
     const userType = recordUserType(record);
     if (userType !== 'basic' && !allowPrivilegedUserTypes) {
-      throw forbiddenError('Super admin access is required to create premium or staff visa users.');
+      throw forbiddenError('Super admin access is required to create premium, staff or nominee visa users.');
     }
     const explicitAccessCode = String(record.accessCode || record.AccessCode || record.code || record.Code || '').trim();
     await pool.query(
@@ -499,6 +510,7 @@ async function getVisaPricingPg() {
   return {
     basic: parsePrice(values.get(VISA_PRICE_KEYS.basic), DEFAULT_VISA_PRICING.basic),
     premium: parsePrice(values.get(VISA_PRICE_KEYS.premium), DEFAULT_VISA_PRICING.premium),
+    nominee: parsePrice(values.get(VISA_PRICE_KEYS.nominee), DEFAULT_VISA_PRICING.nominee),
     staff: 0
   };
 }
@@ -507,13 +519,21 @@ async function updateVisaPricingPg(fields) {
   const current = await getVisaPricingPg();
   const next = {
     basic: parsePrice(fields.basic, current.basic),
-    premium: parsePrice(fields.premium, current.premium)
+    premium: parsePrice(fields.premium, current.premium),
+    nominee: parsePrice(fields.nominee, current.nominee)
   };
   await pool.query(
     `insert into app_settings (key, value, updated_at)
-     values ($1, $2, now()), ($3, $4, now())
+     values ($1, $2, now()), ($3, $4, now()), ($5, $6, now())
      on conflict (key) do update set value = excluded.value, updated_at = now()`,
-    [VISA_PRICE_KEYS.basic, String(next.basic), VISA_PRICE_KEYS.premium, String(next.premium)]
+    [
+      VISA_PRICE_KEYS.basic,
+      String(next.basic),
+      VISA_PRICE_KEYS.premium,
+      String(next.premium),
+      VISA_PRICE_KEYS.nominee,
+      String(next.nominee)
+    ]
   );
   return getVisaPricingPg();
 }
@@ -612,7 +632,7 @@ async function upsertApplicationPg(app) {
         String(app.salary || ''),
         String(app.employmentLength || ''),
         String(app.notes || ''),
-        String(app.fee || 'Basic visa package: visa fee included, admin processing fee included, Headies ticket fee included'),
+        feeLabelForUserType(userType),
         String(app.status || 'Draft'),
         String(app.paymentStatus || 'Unpaid'),
         String(app.paymentReference || ''),
@@ -720,8 +740,8 @@ async function ensureApplicationRowPg(client, applicationId) {
   );
   const applicant = eligibleResult.rows[0] || null;
   await client.query(
-    `insert into visa_applications (id, applicant_id, name, email, phone, applicant_category, user_type, status, created_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, 'Draft', now(), now())
+    `insert into visa_applications (id, applicant_id, name, email, phone, applicant_category, user_type, fee, status, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, 'Draft', now(), now())
      on conflict (id) do nothing`,
     [
       applicationId,
@@ -730,7 +750,8 @@ async function ensureApplicationRowPg(client, applicationId) {
       applicant ? applicant.email : '',
       applicant ? applicant.phone : '',
       applicant ? applicant.category : '',
-      normalizeUserType(applicant && applicant.user_type)
+      normalizeUserType(applicant && applicant.user_type),
+      feeLabelForUserType(applicant && applicant.user_type)
     ]
   );
   return applicationId;
@@ -845,7 +866,7 @@ async function upsertEligibleRecordsJson(records, options = {}) {
     const existing = store.eligibleApplicants.find((item) => normalizeEmail(item.email) === email);
     if (existing && !allowExistingUpdates) throw forbiddenError('Super admin access is required to edit an existing allowlist applicant.');
     const userType = recordUserType(record, existing && existing.userType);
-    if (userType !== 'basic' && !allowPrivilegedUserTypes) throw forbiddenError('Super admin access is required to create premium or staff visa users.');
+    if (userType !== 'basic' && !allowPrivilegedUserTypes) throw forbiddenError('Super admin access is required to create premium, staff or nominee visa users.');
     const explicitAccessCode = String(record.accessCode || record.AccessCode || record.code || record.Code || '').trim();
     const next = {
       id: existing ? existing.id : makeId('elig'),
@@ -953,6 +974,7 @@ async function getVisaPricingJson() {
   return {
     basic: parsePrice(pricing.basic, DEFAULT_VISA_PRICING.basic),
     premium: parsePrice(pricing.premium, DEFAULT_VISA_PRICING.premium),
+    nominee: parsePrice(pricing.nominee, DEFAULT_VISA_PRICING.nominee),
     staff: 0
   };
 }
@@ -962,7 +984,8 @@ async function updateVisaPricingJson(fields) {
   const current = await getVisaPricingJson();
   store.visaPricing = {
     basic: parsePrice(fields.basic, current.basic),
-    premium: parsePrice(fields.premium, current.premium)
+    premium: parsePrice(fields.premium, current.premium),
+    nominee: parsePrice(fields.nominee, current.nominee)
   };
   writeStore(store);
   return getVisaPricingJson();
@@ -1053,11 +1076,13 @@ async function upsertApplicationJson(app) {
   const id = app.id || app.applicantId || makeId('visa');
   const existing = store.visaApplications.find((item) => item.id === id || item.applicantId === id);
   const applicant = store.eligibleApplicants.find((item) => item.id === (app.applicantId || id)) || null;
+  const userType = normalizeUserType((applicant && applicant.userType) || app.userType || (existing && existing.userType));
   const application = {
     ...app,
     id,
     applicantId: app.applicantId || id,
-    userType: normalizeUserType((applicant && applicant.userType) || app.userType || (existing && existing.userType)),
+    userType,
+    fee: feeLabelForUserType(userType),
     status: app.status || (existing && existing.status) || 'Draft',
     paymentStatus: app.paymentStatus || (existing && existing.paymentStatus) || 'Unpaid',
     paymentReference: app.paymentReference || (existing && existing.paymentReference) || '',
@@ -1100,6 +1125,7 @@ async function setApplicationDocumentJson(applicationId, payload) {
   let app = store.visaApplications.find((item) => item.id === id || item.applicantId === id);
   if (!app) {
     const applicant = store.eligibleApplicants.find((item) => item.id === id) || null;
+    const userType = normalizeUserType(applicant && applicant.userType);
     app = {
       id,
       applicantId: id,
@@ -1107,7 +1133,8 @@ async function setApplicationDocumentJson(applicationId, payload) {
       email: (applicant && applicant.email) || '',
       phone: (applicant && applicant.phone) || '',
       applicantCategory: (applicant && applicant.category) || '',
-      userType: normalizeUserType(applicant && applicant.userType),
+      userType,
+      fee: feeLabelForUserType(userType),
       status: 'Draft',
       paymentStatus: 'Unpaid',
       uploads: [],

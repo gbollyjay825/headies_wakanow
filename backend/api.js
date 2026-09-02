@@ -33,9 +33,21 @@ function safePaymentFields(application) {
   };
 }
 
+function unpaidPaymentFields(userType = 'basic') {
+  return {
+    paymentStatus: 'Unpaid',
+    paymentReference: '',
+    paymentAmount: 0,
+    paymentCurrency: 'NGN',
+    paymentPaidAt: '',
+    userType: normalizeUserType(userType)
+  };
+}
+
 function normalizeUserType(value) {
-  const type = String(value || '').trim().toLowerCase();
-  return ['basic', 'premium', 'staff'].includes(type) ? type : 'basic';
+  const input = String(value || '').trim().toLowerCase();
+  const type = input === 'nominees' ? 'nominee' : input;
+  return ['basic', 'premium', 'staff', 'nominee'].includes(type) ? type : 'basic';
 }
 
 function requestSuperCode(body, req) {
@@ -100,11 +112,13 @@ async function notifyTravelRequest(request) {
 function userTypeLabel(userType) {
   if (userType === 'premium') return 'Premium';
   if (userType === 'staff') return 'Staff';
+  if (userType === 'nominee') return 'Nominees';
   return 'Basic';
 }
 
 function feeLabelFor(userType) {
   if (userType === 'staff') return 'Staff visa package: no payment required';
+  if (userType === 'nominee') return 'Nominees visa only: visa fee included; admin processing and Headies ticket fees not included';
   return `${userTypeLabel(userType)} visa package: visa fee included, admin processing fee included, Headies ticket fee included`;
 }
 
@@ -132,13 +146,17 @@ function staffSubmissionFields(applicationId, existing) {
 
 async function submissionPaymentPolicy(applicationId, existing) {
   const eligible = await repository.getEligible((existing && existing.applicantId) || applicationId);
+  const eligibleActive = Boolean(eligible && eligible.status === 'active');
+  const userType = normalizeUserType(eligible && eligible.userType);
   const isStaff = Boolean(
-    eligible &&
-    eligible.status === 'active' &&
-    normalizeUserType(eligible.userType) === 'staff'
+    eligibleActive &&
+    userType === 'staff'
   );
   return {
+    eligibleActive,
+    userType,
     isStaff,
+    paymentTypeMatches: Boolean(existing && normalizeUserType(existing.userType) === userType),
     fields: isStaff ? staffSubmissionFields(applicationId, existing) : safePaymentFields(existing)
   };
 }
@@ -146,6 +164,7 @@ async function submissionPaymentPolicy(applicationId, existing) {
 function priceForUserType(pricing, userType) {
   if (userType === 'premium') return Number(pricing.premium || 0);
   if (userType === 'staff') return 0;
+  if (userType === 'nominee') return Number(pricing.nominee || 0);
   return Number(pricing.basic || 0);
 }
 
@@ -375,22 +394,38 @@ async function handleApi(method, pathname, body = {}, req = null) {
       const applicationId = String(body.applicationId || body.applicantId || body.id || '').trim();
       if (!applicationId) return response(400, { error: 'Application id is required for payment.' });
 
-      const email = String(body.email || '').trim().toLowerCase();
-      if (!email) return response(400, { error: 'Applicant email is required for payment.' });
+      const existing = await repository.getApplication(applicationId);
+      const requestedApplicantId = String(body.applicantId || applicationId).trim();
+      const existingApplicantId = String((existing && (existing.applicantId || existing.id)) || '').trim();
+      if (existing && requestedApplicantId !== existingApplicantId) {
+        return response(409, { error: 'The applicant assigned to an existing visa application cannot be changed.' });
+      }
 
-      const eligible = await repository.getEligible(body.applicantId || applicationId);
+      const applicantId = existing ? existingApplicantId : requestedApplicantId;
+      const eligible = await repository.getEligible(applicantId);
       if (!eligible || eligible.status !== 'active') return response(403, { error: 'Applicant is not active on the visa allowlist.' });
       const userType = normalizeUserType(eligible.userType);
+      const paymentTypeChanged = Boolean(existing && normalizeUserType(existing.userType) !== userType);
+      if (existing && existing.status !== 'Draft') {
+        return response(409, { error: 'A payment cannot be started after the visa application has left Draft status.' });
+      }
+      if (existing && existing.paymentStatus === 'Paid' && !paymentTypeChanged) {
+        return response(409, { error: 'This application already has a verified payment. Contact the visa admin team before starting another payment.' });
+      }
+
+      const email = String(eligible.email || body.email || '').trim().toLowerCase();
+      if (!email) return response(400, { error: 'Applicant email is required for payment.' });
+
       const pricing = await repository.getVisaPricing();
       const applicants = parseApplicants(body.applicants);
       const amount = calculateVisaAmountKobo(applicants, priceForUserType(pricing, userType));
       const currency = 'NGN';
-      const reference = userType === 'staff' ? makeStaffReference(applicationId) : makePaymentReference(applicationId);
+      const canonicalApplicationId = String((existing && existing.id) || applicationId).trim();
+      const reference = userType === 'staff' ? makeStaffReference(canonicalApplicationId) : makePaymentReference(canonicalApplicationId);
       const callbackUrl = cleanCallbackUrl(body.callbackUrl);
-      const existing = await repository.getApplication(applicationId);
       const baseApplication = {
-        id: applicationId,
-        applicantId: body.applicantId || applicationId,
+        id: canonicalApplicationId,
+        applicantId,
         name: body.name || eligible.name || (existing && existing.name) || '',
         email,
         phone: body.phone || eligible.phone || (existing && existing.phone) || '',
@@ -442,8 +477,8 @@ async function handleApi(method, pathname, body = {}, req = null) {
           reference,
           callback_url: callbackUrl || undefined,
           metadata: {
-            applicationId,
-            applicantId: body.applicantId || applicationId,
+            applicationId: canonicalApplicationId,
+            applicantId,
             applicants,
             userType,
             product: 'Headies x Wakanow Canada Business Visa'
@@ -458,7 +493,7 @@ async function handleApi(method, pathname, body = {}, req = null) {
         };
         const application = await repository.upsertApplication({
           ...baseApplication,
-          paymentPaidAt: (existing && existing.paymentPaidAt) || '',
+          paymentPaidAt: '',
           ...paymentFields
         });
 
@@ -560,18 +595,54 @@ async function handleApi(method, pathname, body = {}, req = null) {
     }
     if (method === 'POST' && parts.length === 3) {
       const nextBody = { ...body };
+      const applicationId = String(nextBody.id || nextBody.applicantId || '').trim();
+      const existing = applicationId ? await repository.getApplication(applicationId) : null;
+      if (existing) {
+        const existingApplicantId = String(existing.applicantId || existing.id || '').trim();
+        if (nextBody.applicantId != null && String(nextBody.applicantId).trim() !== existingApplicantId) {
+          return response(409, { error: 'The applicant assigned to an existing visa application cannot be changed.' });
+        }
+        const paymentIsBound = existing.paymentStatus === 'Pending' || existing.paymentStatus === 'Paid';
+        if (paymentIsBound) {
+          const eligible = await repository.getEligible(existing.applicantId || applicationId);
+          const assignedUserType = normalizeUserType(eligible && eligible.userType);
+          if (assignedUserType !== 'staff' && normalizeUserType(existing.userType) !== assignedUserType) {
+            return response(409, { error: 'The assigned visa type changed after payment started. Start a new payment for the current visa type.' });
+          }
+          if (
+            assignedUserType !== 'staff' &&
+            nextBody.applicants != null &&
+            parseApplicants(nextBody.applicants) !== parseApplicants(existing.applicants)
+          ) {
+            return response(409, { error: 'The applicant count changed after payment started. Start a new payment for the current number of applicants.' });
+          }
+        }
+        nextBody.id = existing.id;
+        nextBody.applicantId = existingApplicantId;
+        Object.assign(nextBody, safePaymentFields(existing));
+      } else {
+        const eligible = applicationId ? await repository.getEligible(nextBody.applicantId || applicationId) : null;
+        Object.assign(nextBody, unpaidPaymentFields(eligible && eligible.userType));
+      }
       if (nextBody.status != null) {
         const status = normalizeVisaApplicationStatus(nextBody.status);
         if (!status) return response(400, { error: 'Choose a valid visa application status.' });
         nextBody.status = status;
       }
       if (nextBody.status === 'Submitted') {
-        const applicationId = nextBody.id || nextBody.applicantId;
-        const existing = applicationId ? await repository.getApplication(applicationId) : null;
         if (!existing) return response(404, { error: 'Application not found' });
         const paymentPolicy = await submissionPaymentPolicy(applicationId, existing);
+        if (!paymentPolicy.eligibleActive) {
+          return response(403, { error: 'Applicant is not active on the visa allowlist.' });
+        }
         if (!paymentPolicy.isStaff && existing.paymentStatus !== 'Paid') {
           return response(402, { error: 'Verified payment is required before submission.' });
+        }
+        if (!paymentPolicy.isStaff && !paymentPolicy.paymentTypeMatches) {
+          return response(409, { error: 'The assigned visa type changed after payment. Start a new payment for the current visa type.' });
+        }
+        if (!paymentPolicy.isStaff && parseApplicants(nextBody.applicants) !== parseApplicants(existing.applicants)) {
+          return response(409, { error: 'The applicant count cannot change after payment. Contact the visa admin team if it needs to be corrected.' });
         }
         if (nextBody.reviewConfirmed !== true) {
           return response(400, { error: 'Review confirmation is required before submission.' });
@@ -599,8 +670,14 @@ async function handleApi(method, pathname, body = {}, req = null) {
         const existing = await repository.getApplication(parts[3]);
         if (!existing) return response(404, { error: 'Application not found' });
         const paymentPolicy = await submissionPaymentPolicy(parts[3], existing);
+        if (!paymentPolicy.eligibleActive) {
+          return response(403, { error: 'Applicant is not active on the visa allowlist.' });
+        }
         if (!paymentPolicy.isStaff && existing.paymentStatus !== 'Paid') {
           return response(402, { error: 'Verified payment is required before submission.' });
+        }
+        if (!paymentPolicy.isStaff && !paymentPolicy.paymentTypeMatches) {
+          return response(409, { error: 'The assigned visa type changed after payment. Start a new payment for the current visa type.' });
         }
         const uploaded = uploadedFieldSet(existing, undefined);
         const missing = requiredDocFieldsFor(existing.applicantCategory).filter((field) => !uploaded.has(field));

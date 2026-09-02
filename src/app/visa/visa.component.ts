@@ -83,8 +83,8 @@ interface UploadDoc {
                 <div class="requirements-card__intro">
                   <p class="section-kicker">Canada Business Visa</p>
                   <h2 class="section-title">Prepare once. Upload securely.</h2>
-                  <p class="requirements-card__copy">The basic package is <strong>{{ basicPriceLabel }}</strong> per applicant. Premium or staff handling is applied automatically from the approved profile after sign in.</p>
-                  <ul class="package-includes" aria-label="Visa package includes">
+                  <p class="requirements-card__copy">The basic package is <strong>{{ basicPriceLabel }}</strong> per applicant and includes all three items below. Approved Nominees profiles instead pay <strong>{{ nomineePriceLabel }}</strong> per applicant for visa only. Premium or staff handling is applied automatically after sign in.</p>
+                  <ul class="package-includes" aria-label="Basic visa package includes">
                     <li><span>Visa fee</span><strong>Included</strong></li>
                     <li><span>Admin processing fee</span><strong>Included</strong></li>
                     <li><span>Headies ticket fee</span><strong>Included</strong></li>
@@ -191,12 +191,12 @@ interface UploadDoc {
                     <div class="payment-card__total">
                       <span>Total due</span>
                       <strong>{{ totalDueLabel }}</strong>
-                      <small>{{ isStaffApplicant ? 'Staff applicant · no card payment' : (application.applicants || 1) + ' applicant(s) · ' + applicantUserTypeLabel + ' package' }}</small>
+                      <small>{{ applicationChargeLabel }}</small>
                     </div>
                     <ul class="fee-breakdown" aria-label="Payment breakdown">
-                      <li><span>Visa fee</span><strong>Included</strong></li>
-                      <li><span>Admin processing fee</span><strong>Included</strong></li>
-                      <li><span>Headies ticket fee</span><strong>Included</strong></li>
+                      <li><span>Visa fee</span><strong>{{ isNomineeApplicant ? 'Included · visa only' : 'Included' }}</strong></li>
+                      <li *ngIf="!isNomineeApplicant"><span>Admin processing fee</span><strong>Included</strong></li>
+                      <li *ngIf="!isNomineeApplicant"><span>Headies ticket fee</span><strong>Included</strong></li>
                     </ul>
                     <div class="payment-card__actions">
                       <button class="btn btn-blue btn-block" type="button" *ngIf="!isStaffApplicant" [disabled]="paymentWorking || paymentPaid" (click)="startPaystackPayment()">
@@ -284,7 +284,7 @@ interface UploadDoc {
                   <label class="field"><span class="form-label">Name</span><input name="name" [(ngModel)]="application.name" required class="readonly-field"></label>
                   <label class="field"><span class="form-label">Phone</span><input name="appPhone" [(ngModel)]="application.phone" required></label>
                   <label class="field"><span class="form-label">Email</span><input name="appEmail" type="email" [(ngModel)]="application.email" required class="readonly-field"></label>
-                  <label class="field"><span class="form-label">Applicants</span><input name="applicants" type="number" min="1" [(ngModel)]="application.applicants" required></label>
+                  <label class="field"><span class="form-label">Applicants</span><input name="applicants" type="number" min="1" [(ngModel)]="application.applicants" [readonly]="paymentPaid" required></label>
                   <label class="field"><span class="form-label">Applicant category</span>
                     <select name="applicantCategory" [(ngModel)]="application.applicantCategory" required>
                       <option value="">Select category</option>
@@ -390,7 +390,7 @@ export class VisaComponent implements OnInit {
   reviewConfirmed = false;
   currentApplicant: EligibleApplicant | null = null;
   existingApplication: VisaApplication | null = null;
-  pricing: VisaPricing = { basic: 745000, premium: 745000, staff: 0 };
+  pricing: VisaPricing = { basic: 745000, premium: 745000, nominee: 350000, staff: 0 };
 
   loginModel = { email: '', accessCode: '' };
   signupModel = { name: '', email: '', phone: '', accessCode: '', confirmAccessCode: '', category: '', notes: '' };
@@ -440,9 +440,14 @@ export class VisaComponent implements OnInit {
   async loadPricing(): Promise<void> {
     try {
       const { pricing } = await this.api.getVisaPricing();
-      this.pricing = pricing;
+      this.pricing = {
+        basic: Number(pricing.basic ?? 745000),
+        premium: Number(pricing.premium ?? 745000),
+        nominee: Number(pricing.nominee ?? 350000),
+        staff: Number(pricing.staff ?? 0)
+      };
     } catch {
-      this.pricing = { basic: 745000, premium: 745000, staff: 0 };
+      this.pricing = { basic: 745000, premium: 745000, nominee: 350000, staff: 0 };
     }
   }
 
@@ -485,24 +490,29 @@ export class VisaComponent implements OnInit {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
   }
 
-  get applicantUserType(): 'basic' | 'premium' | 'staff' {
+  get applicantUserType(): 'basic' | 'premium' | 'staff' | 'nominee' {
     const type = this.currentApplicant?.userType || this.application.userType || 'basic';
-    return ['basic', 'premium', 'staff'].includes(type) ? type : 'basic';
+    return ['basic', 'premium', 'staff', 'nominee'].includes(type) ? type : 'basic';
   }
 
   get isStaffApplicant(): boolean {
     return this.applicantUserType === 'staff';
   }
 
+  get isNomineeApplicant(): boolean {
+    return this.applicantUserType === 'nominee';
+  }
+
   get applicantUserTypeLabel(): string {
     if (this.applicantUserType === 'premium') return 'Premium';
     if (this.applicantUserType === 'staff') return 'Staff';
+    if (this.applicantUserType === 'nominee') return 'Nominees';
     return 'Basic';
   }
 
   get totalDue(): number {
     if (this.isStaffApplicant) return 0;
-    const perApplicant = this.applicantUserType === 'premium' ? this.pricing.premium : this.pricing.basic;
+    const perApplicant = this.pricing[this.applicantUserType];
     return this.applicantCount * Number(perApplicant || 0);
   }
 
@@ -511,8 +521,20 @@ export class VisaComponent implements OnInit {
     return `NGN ${this.totalDue.toLocaleString()}`;
   }
 
+  get applicationChargeLabel(): string {
+    if (this.isStaffApplicant) return 'Staff applicant · no card payment';
+    const applicants = `${this.application.applicants || 1} applicant(s)`;
+    return this.isNomineeApplicant
+      ? `${applicants} · Nominees visa only`
+      : `${applicants} · ${this.applicantUserTypeLabel} package`;
+  }
+
   get basicPriceLabel(): string {
     return `NGN ${Number(this.pricing.basic || 0).toLocaleString()}`;
+  }
+
+  get nomineePriceLabel(): string {
+    return `NGN ${Number(this.pricing.nominee || 0).toLocaleString()}`;
   }
 
   get paymentPaid(): boolean {
@@ -677,7 +699,18 @@ export class VisaComponent implements OnInit {
       this.application.email = this.application.email || applicant.email;
       this.application.phone = this.application.phone || applicant.phone;
       this.application.applicantCategory = this.application.applicantCategory || applicant.category;
+      const assignedUserType = applicant.userType || 'basic';
+      const paidTypeChanged = assignedUserType !== 'staff'
+        && application.paymentStatus === 'Paid'
+        && (application.userType || 'basic') !== assignedUserType;
       this.application.userType = applicant.userType || application.userType || 'basic';
+      if (paidTypeChanged) {
+        this.application.paymentStatus = 'Unpaid';
+        this.application.paymentReference = '';
+        this.application.paymentAmount = 0;
+        this.application.paymentPaidAt = '';
+        this.paymentStatus = 'Your assigned visa type changed. Pay the current visa fee before submission.';
+      }
       this.hydrateUploads(application.uploads || []);
       this.uploadUnlocked = this.paymentPaid || Boolean((application.uploads || []).some((upload) => (upload.files || []).length));
       if (application.passportDetails?.parsed) {

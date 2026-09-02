@@ -33,7 +33,7 @@ create table if not exists visa_eligible_applicants (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint visa_eligible_status_check check (status in ('pending', 'active', 'blocked')),
-  constraint visa_eligible_user_type_check check (user_type in ('basic', 'premium', 'staff')),
+  constraint visa_eligible_user_type_check check (user_type in ('basic', 'premium', 'staff', 'nominee')),
   constraint visa_eligible_source_check check (source in ('admin', 'signup'))
 );
 
@@ -77,7 +77,7 @@ begin
 
   alter table visa_eligible_applicants
     add constraint visa_eligible_user_type_check
-    check (user_type in ('basic', 'premium', 'staff'));
+    check (user_type in ('basic', 'premium', 'staff', 'nominee'));
 
   if exists (
     select 1 from pg_constraint
@@ -179,7 +179,7 @@ begin
 
   alter table visa_applications
     add constraint visa_applications_user_type_check
-    check (user_type in ('basic', 'premium', 'staff'));
+    check (user_type in ('basic', 'premium', 'staff', 'nominee'));
 
   if exists (
     select 1 from pg_constraint
@@ -219,5 +219,6 @@ create table if not exists app_settings (
 insert into app_settings (key, value)
 values
   ('visa_basic_fee_naira', '745000'),
-  ('visa_premium_fee_naira', '745000')
+  ('visa_premium_fee_naira', '745000'),
+  ('visa_nominee_fee_naira', '350000')
 on conflict (key) do nothing;

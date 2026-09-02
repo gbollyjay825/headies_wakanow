@@ -11,7 +11,8 @@ const dataFile = process.env.WKN_STORE_FILE || path.join(dataDir, 'store.json');
 const emptyStore = {
   requests: [],
   eligibleApplicants: [],
-  visaApplications: []
+  visaApplications: [],
+  visaPricing: {}
 };
 
 function ensureStore() {
@@ -28,7 +29,8 @@ function readStore() {
     return {
       requests: Array.isArray(parsed.requests) ? parsed.requests : [],
       eligibleApplicants: Array.isArray(parsed.eligibleApplicants) ? parsed.eligibleApplicants : [],
-      visaApplications: Array.isArray(parsed.visaApplications) ? parsed.visaApplications : []
+      visaApplications: Array.isArray(parsed.visaApplications) ? parsed.visaApplications : [],
+      visaPricing: parsed.visaPricing && typeof parsed.visaPricing === 'object' ? parsed.visaPricing : {}
     };
   } catch (error) {
     return { ...emptyStore };
@@ -40,7 +42,8 @@ function writeStore(nextStore) {
   const normalized = {
     requests: Array.isArray(nextStore.requests) ? nextStore.requests : [],
     eligibleApplicants: Array.isArray(nextStore.eligibleApplicants) ? nextStore.eligibleApplicants : [],
-    visaApplications: Array.isArray(nextStore.visaApplications) ? nextStore.visaApplications : []
+    visaApplications: Array.isArray(nextStore.visaApplications) ? nextStore.visaApplications : [],
+    visaPricing: nextStore.visaPricing && typeof nextStore.visaPricing === 'object' ? nextStore.visaPricing : {}
   };
   fs.writeFileSync(dataFile, JSON.stringify(normalized, null, 2));
   return normalized;

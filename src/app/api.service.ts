@@ -40,7 +40,7 @@ export interface EligibleApplicant {
   phone: string;
   accessCode?: string;
   category: string;
-  userType?: 'basic' | 'premium' | 'staff';
+  userType?: 'basic' | 'premium' | 'staff' | 'nominee';
   status: 'pending' | 'active' | 'blocked';
   source?: 'admin' | 'signup';
   notes: string;
@@ -96,7 +96,7 @@ export interface VisaApplication {
   phone: string;
   applicants: string;
   applicantCategory: string;
-  userType?: 'basic' | 'premium' | 'staff';
+  userType?: 'basic' | 'premium' | 'staff' | 'nominee';
   passportExpiry: string;
   travelDate: string;
   travelHistory: string;
@@ -125,13 +125,14 @@ export interface PaystackPaymentInit {
   reference: string;
   amount: number;
   currency: string;
-  userType?: 'basic' | 'premium' | 'staff';
+  userType?: 'basic' | 'premium' | 'staff' | 'nominee';
   staff?: boolean;
 }
 
 export interface VisaPricing {
   basic: number;
   premium: number;
+  nominee: number;
   staff: number;
 }
 

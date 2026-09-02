@@ -81,7 +81,7 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
               <div class="admin-import-card__copy">
                 <span class="badge">Primary setup</span>
                 <h2>Import allowlist</h2>
-                <p>Upload a CSV of approved applicant emails first. Columns can include name, email, phone, accessCode, category, userType, status and notes. Blank user type becomes Basic.</p>
+                <p>Upload a CSV of approved applicant emails first. Columns can include name, email, phone, accessCode, category, userType, status and notes. Use basic, premium, staff or nominee; a blank user type becomes Basic.</p>
               </div>
               <form class="admin-import-card__form" (ngSubmit)="importApplicants(importCsvInput)">
                 <label class="field">
@@ -101,13 +101,14 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
               <div class="admin-card__head admin-card__head--row">
                 <div>
                   <h2>Visa pricing</h2>
-                  <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Basic uses the current package price. Premium can be changed by super admin. Staff users pay nothing.</p>
+                  <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Basic and Premium use package pricing. Nominees pay for visa only. Staff users pay nothing.</p>
                 </div>
                 <span class="badge">{{ isSuperAdmin ? 'Super admin controls' : 'View only' }}</span>
               </div>
               <form class="admin-form-grid" (ngSubmit)="updatePricing()">
                 <label class="field"><span class="form-label">Basic price</span><input name="basicPrice" type="number" min="0" step="1000" [(ngModel)]="pricingModel.basic" [disabled]="!isSuperAdmin"></label>
                 <label class="field"><span class="form-label">Premium price</span><input name="premiumPrice" type="number" min="0" step="1000" [(ngModel)]="pricingModel.premium" [disabled]="!isSuperAdmin"></label>
+                <label class="field"><span class="form-label">Nominees price · visa only</span><input name="nomineePrice" type="number" min="0" step="1000" [(ngModel)]="pricingModel.nominee" [disabled]="!isSuperAdmin"></label>
                 <label class="field"><span class="form-label">Staff price</span><input name="staffPrice" type="text" [value]="money(pricing.staff)" disabled></label>
                 <button class="btn btn-blue btn-block" type="submit" [disabled]="!isSuperAdmin || pricingWorking">{{ pricingWorking ? 'Saving...' : 'Save pricing' }}</button>
               </form>
@@ -227,7 +228,7 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                         </div>
                         <div>
                           <dt>Amount</dt>
-                          <dd>{{ selectedApp.paymentAmount ? money(selectedApp.paymentAmount) : (selectedApp.userType === 'staff' ? 'Staff comp' : 'Pending') }}</dd>
+                          <dd>{{ selectedApp.paymentAmount ? moneyMinorUnits(selectedApp.paymentAmount) : (selectedApp.userType === 'staff' ? 'Staff comp' : 'Pending') }}</dd>
                         </div>
                         <div>
                           <dt>Travel date</dt>
@@ -441,6 +442,7 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                           <option value="basic">Basic</option>
                           <option value="premium">Premium</option>
                           <option value="staff">Staff</option>
+                          <option value="nominee">Nominees</option>
                         </select>
                       </label>
                       <label class="field"><span class="form-label">Category</span>
@@ -453,7 +455,7 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                       </label>
                     </div>
                     <label class="field"><span class="form-label">Notes</span><textarea name="notes" [(ngModel)]="newApplicant.notes"></textarea></label>
-                    <p class="form-status" *ngIf="!isSuperAdmin">Regular admin can preload Basic users. Premium and Staff require super admin.</p>
+                    <p class="form-status" *ngIf="!isSuperAdmin">Regular admin can preload Basic users. Premium, Staff and Nominees require super admin.</p>
                     <button class="btn btn-blue btn-block" type="submit">Preload email</button>
                     <p class="form-status" role="status">{{ addStatus }}</p>
                   </form>
@@ -506,6 +508,7 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                               <option value="basic">Basic</option>
                               <option value="premium">Premium</option>
                               <option value="staff">Staff</option>
+                              <option value="nominee">Nominees</option>
                             </select>
                           </td>
                           <td data-label="Category">{{ applicant.category || 'Unassigned' }}</td>
@@ -550,8 +553,8 @@ export class AdminComponent implements OnInit {
   travelRequests: TravelRequest[] = [];
   applicants: EligibleApplicant[] = [];
   applications: VisaApplication[] = [];
-  pricing: VisaPricing = { basic: 745000, premium: 745000, staff: 0 };
-  pricingModel = { basic: 745000, premium: 745000 };
+  pricing: VisaPricing = { basic: 745000, premium: 745000, nominee: 350000, staff: 0 };
+  pricingModel = { basic: 745000, premium: 745000, nominee: 350000 };
   importFile: File | null = null;
   selectedImportFileName = '';
   activeTab: 'requests' | 'applications' | 'setup' | 'allowlist' = 'requests';
@@ -725,8 +728,13 @@ export class AdminComponent implements OnInit {
       this.applicants = eligible.applicants;
       this.applications = apps.applications.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
       this.selectedApplicationId = this.applications.some((app) => app.id === previousSelection) ? previousSelection : (this.applications[0]?.id || '');
-      this.pricing = pricing.pricing;
-      this.pricingModel = { basic: pricing.pricing.basic, premium: pricing.pricing.premium };
+      this.pricing = {
+        basic: Number(pricing.pricing.basic ?? 745000),
+        premium: Number(pricing.pricing.premium ?? 745000),
+        nominee: Number(pricing.pricing.nominee ?? 350000),
+        staff: Number(pricing.pricing.staff ?? 0)
+      };
+      this.pricingModel = { basic: this.pricing.basic, premium: this.pricing.premium, nominee: this.pricing.nominee };
       this.dashboardStatus = '';
     } catch (error) {
       this.dashboardStatus = error instanceof Error && error.message && error.message !== 'Request failed'
@@ -815,7 +823,8 @@ export class AdminComponent implements OnInit {
     return {
       basic: 'Basic',
       premium: 'Premium',
-      staff: 'Staff'
+      staff: 'Staff',
+      nominee: 'Nominees'
     }[type];
   }
 
@@ -902,7 +911,7 @@ export class AdminComponent implements OnInit {
     try {
       const { pricing } = await this.api.updateVisaPricing(this.pricingModel, this.superAdminCode);
       this.pricing = pricing;
-      this.pricingModel = { basic: pricing.basic, premium: pricing.premium };
+      this.pricingModel = { basic: pricing.basic, premium: pricing.premium, nominee: pricing.nominee };
       this.pricingStatus = 'Visa pricing updated.';
     } catch (error) {
       this.pricingStatus = error instanceof Error && error.message && error.message !== 'Request failed'
@@ -1125,6 +1134,10 @@ export class AdminComponent implements OnInit {
 
   money(value: number): string {
     return `NGN ${Number(value || 0).toLocaleString()}`;
+  }
+
+  moneyMinorUnits(value: number): string {
+    return this.money(Number(value || 0) / 100);
   }
 
   formatDate(value?: string): string {
