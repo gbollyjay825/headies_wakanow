@@ -1,0 +1,206 @@
+<div class="package-page">
+  <header class="package-nav">
+    <div class="container package-nav__inner">
+      <a class="brand" routerLink="/" aria-label="The Headies and Wakanow home">
+        <img src="/assets/headies-logo.png" alt="The Headies">
+        <span class="brand__divider" aria-hidden="true"></span>
+        <img src="/assets/wakanow-logo.png" alt="Wakanow">
+      </a>
+      <a class="package-nav__back" routerLink="/" fragment="packages"><span aria-hidden="true">←</span> All packages</a>
+    </div>
+  </header>
+
+  <main class="container package-main">
+    <div *ngIf="loading" class="package-state" role="status" aria-live="polite">
+      <span class="loading-mark" aria-hidden="true"></span>
+      <h1>Your Headies experience, coming into view.</h1>
+      <p>Loading package details…</p>
+    </div>
+    <div *ngIf="!loading && loadError" class="package-state" role="alert">
+      <p class="section-kicker">Let’s try that again</p>
+      <h1>We couldn’t load this package.</h1>
+      <p>{{ loadError }}</p>
+      <button type="button" class="btn btn-primary" (click)="retryLoad()">Try again</button>
+      <a class="btn btn-secondary" routerLink="/" fragment="packages">Explore packages</a>
+    </div>
+
+    <ng-container *ngIf="!loading && displayPackage as pkg">
+      <section class="package-intro" aria-labelledby="package-title">
+        <p class="package-eyebrow">THE HEADIES 2026 <span aria-hidden="true">/</span> TORONTO, CANADA</p>
+        <div class="package-intro__row">
+          <div>
+            <div class="package-tier"><span aria-hidden="true">{{ '★'.repeat(pkg.stars) }}</span> {{ pkg.stars }}-star experience</div>
+            <h1 id="package-title">{{ pkg.name }}</h1>
+            <p class="package-tagline">{{ pkg.tagline }}</p>
+          </div>
+          <div class="package-intro__price">
+            <span>Per person</span>
+            <strong>{{ money(pkg.priceNaira) }}</strong>
+            <small>Flight · hotel · transfers · more</small>
+          </div>
+        </div>
+        <ol class="booking-journey" aria-label="Booking journey">
+          <li><span>01</span> Explore your package</li>
+          <li [class.is-current]="!paid"><span>02</span> Your details &amp; payment</li>
+          <li [class.is-current]="paid"><span>03</span> Booking follow-up</li>
+        </ol>
+        <a class="mobile-booking-link" [routerLink]="[]" fragment="package-checkout" queryParamsHandling="preserve">Your booking details <span aria-hidden="true">↓</span></a>
+      </section>
+
+      <div class="package-layout">
+        <div class="package-story">
+          <figure class="package-art">
+            <img [src]="pkg.image" [alt]="pkg.name + ' — The Headies 2026 Toronto travel package'" fetchpriority="high">
+            <figcaption>
+              <span>The Headies. Your way.</span>
+              <a [href]="pkg.image" [download]="pkg.slug + '-headies-package.jpg'">Download flyer <span aria-hidden="true">↓</span></a>
+            </figcaption>
+          </figure>
+
+          <section class="details-section" aria-labelledby="experience-heading">
+            <p class="section-kicker">A trip worth making</p>
+            <h2 id="experience-heading">More than an awards weekend.</h2>
+            <p>{{ pkg.description }}</p>
+            <dl class="trip-facts">
+              <div><dt>Destination</dt><dd>Toronto, Canada</dd></div>
+              <div><dt>Travel dates</dt><dd>{{ pkg.travelDates || 'Travel team will confirm' }}</dd></div>
+              <div><dt>Departure</dt><dd>{{ pkg.departureCity || 'Tell us your preferred city' }}</dd></div>
+              <div><dt>Hotel stay</dt><dd>{{ pkg.nights ? pkg.nights + ' nights' : 'Travel team will confirm' }}</dd></div>
+            </dl>
+          </section>
+
+          <section class="details-section" aria-labelledby="included-heading">
+            <p class="section-kicker">Your package</p>
+            <h2 id="included-heading">What’s included</h2>
+            <ul class="included-list">
+              <li *ngFor="let inclusion of pkg.inclusions"><span class="included-check" aria-hidden="true">✓</span><span>{{ inclusion }}</span></li>
+            </ul>
+            <div class="exclusions" *ngIf="pkg.exclusions.length">
+              <h3>Visa &amp; additional costs</h3>
+              <ul><li *ngFor="let exclusion of pkg.exclusions">{{ exclusion }}</li></ul>
+            </div>
+          </section>
+
+          <section class="details-section" aria-labelledby="hotels-heading">
+            <p class="section-kicker">Check in. Settle in.</p>
+            <h2 id="hotels-heading">Your hotel collection</h2>
+            <p>Featured hotel options for this package. Your hotel and room arrangements are confirmed separately with the travel team.</p>
+            <ul class="hotel-collection">
+              <li *ngFor="let hotel of pkg.hotels; let index = index">
+                <span class="hotel-number" aria-hidden="true">0{{ index + 1 }}</span>
+                <div><h3>{{ hotel }}</h3><p>{{ pkg.tier }} package hotel option</p></div>
+                <span class="hotel-arrow" aria-hidden="true">↗</span>
+              </li>
+            </ul>
+          </section>
+
+          <section class="details-section booking-terms" id="booking-terms" aria-labelledby="terms-heading">
+            <p class="section-kicker">Before you book</p>
+            <h2 id="terms-heading">The details that matter</h2>
+            <p class="terms-copy">{{ pkg.terms || 'Your payment is recorded separately from confirmation of your final itinerary. The Wakanow travel team will follow up using your booking details to arrange your trip.' }}</p>
+            <p *ngIf="pkg.terms">Payment confirmation and travel confirmation are separate. The Wakanow team will follow up about your itinerary and travel arrangements.</p>
+            <p>Visa applications are handled separately. <a routerLink="/visa">Visit the visa portal <span aria-hidden="true">↗</span></a></p>
+          </section>
+        </div>
+
+        <aside class="checkout-column" id="package-checkout" aria-label="Package booking">
+          <section class="checkout-card" *ngIf="!booking">
+            <div class="checkout-heading"><p class="section-kicker">Make it your weekend</p><h2>Your booking details</h2><p>No account needed. Just you, your trip and a few details.</p></div>
+            <div class="availability-note" *ngIf="!pkg.checkoutEnabled" role="status">
+              <span class="availability-dot" aria-hidden="true"></span>
+              <div><strong>Booking temporarily unavailable</strong><p>{{ pkg.unavailableReason || 'Online payment is temporarily unavailable. Please contact the Wakanow team for assistance.' }}</p></div>
+            </div>
+
+            <form class="guest-checkout" #checkoutForm="ngForm" (ngSubmit)="checkout(checkoutForm)" novalidate>
+              <fieldset [disabled]="busy || !payable">
+                <legend class="sr-only">Lead traveller and trip details</legend>
+                <label class="checkout-field" for="full-name"><span>Full name <span class="required-mark">*</span></span>
+                  <input id="full-name" name="fullName" autocomplete="name" placeholder="As it appears on your passport" [(ngModel)]="form.fullName" required minlength="2" maxlength="120" #fullName="ngModel" [attr.aria-invalid]="fullName.invalid && (fullName.touched || formSubmitted)" [attr.aria-describedby]="fullName.invalid && (fullName.touched || formSubmitted) ? 'name-error' : null">
+                  <small id="name-error" class="field-error" *ngIf="fullName.invalid && (fullName.touched || formSubmitted)">Enter the lead traveller’s full name.</small>
+                </label>
+                <div class="checkout-grid">
+                  <label class="checkout-field" for="email"><span>Email address <span class="required-mark">*</span></span>
+                    <input id="email" name="email" type="email" email autocomplete="email" placeholder="you@example.com" [(ngModel)]="form.email" required maxlength="254" #email="ngModel" [attr.aria-invalid]="email.invalid && (email.touched || formSubmitted)" [attr.aria-describedby]="email.invalid && (email.touched || formSubmitted) ? 'email-error' : null">
+                    <small id="email-error" class="field-error" *ngIf="email.invalid && (email.touched || formSubmitted)">Enter a valid email address.</small>
+                  </label>
+                  <label class="checkout-field" for="phone"><span>Phone / WhatsApp <span class="required-mark">*</span></span>
+                    <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="+234…" [(ngModel)]="form.phone" required minlength="7" maxlength="30" pattern="[+0-9() .-]{7,30}" #phone="ngModel" [attr.aria-invalid]="phone.invalid && (phone.touched || formSubmitted)" [attr.aria-describedby]="phone.invalid && (phone.touched || formSubmitted) ? 'phone-error' : null">
+                    <small id="phone-error" class="field-error" *ngIf="phone.invalid && (phone.touched || formSubmitted)">Enter a reachable phone number.</small>
+                  </label>
+                </div>
+                <div class="checkout-divider"><span>Your trip</span></div>
+                <div class="checkout-grid">
+                  <label class="checkout-field" for="travellers"><span>Travellers <span class="required-mark">*</span></span>
+                    <select id="travellers" name="travellers" [(ngModel)]="form.travellers" required><option *ngFor="let count of travellerOptions" [ngValue]="count">{{ count }} {{ count === 1 ? 'person' : 'people' }}</option></select>
+                  </label>
+                  <label class="checkout-field" for="departure-city"><span>{{ pkg.departureCity ? 'Departure city' : 'Preferred departure city' }} <span class="required-mark">*</span></span>
+                    <input id="departure-city" name="departureCity" placeholder="e.g. Lagos" [(ngModel)]="form.departureCity" [readonly]="!!pkg.departureCity" required minlength="2" maxlength="120" #departureCity="ngModel" [attr.aria-invalid]="departureCity.invalid && (departureCity.touched || formSubmitted)" [attr.aria-describedby]="departureCity.invalid && (departureCity.touched || formSubmitted) ? 'departure-error' : null">
+                    <small id="departure-error" class="field-error" *ngIf="departureCity.invalid && (departureCity.touched || formSubmitted)">Enter your departure city (2–120 characters).</small>
+                  </label>
+                  <label class="checkout-field" for="travel-date"><span>Preferred travel date <small>Optional</small></span>
+                    <input id="travel-date" name="travelDate" type="date" [min]="today" [(ngModel)]="form.travelDate">
+                  </label>
+                  <label class="checkout-field" for="room-preference"><span>Room preference</span>
+                    <select id="room-preference" name="roomPreference" [(ngModel)]="form.roomPreference"><option *ngFor="let room of roomOptions" [value]="room">{{ room }}</option></select>
+                  </label>
+                </div>
+                <p class="field-help">Your travel preferences are requests, subject to confirmation. Travelling with children or a group of more than six? Contact our team first.</p>
+                <label class="checkout-field" for="booking-notes"><span>Anything we should know? <small>Optional</small></span>
+                  <textarea id="booking-notes" name="notes" rows="3" maxlength="1000" placeholder="Accessibility needs, travelling together or other requests. Please do not include passport or card details." [(ngModel)]="form.notes"></textarea>
+                </label>
+
+                <div class="order-summary">
+                  <div><span>{{ pkg.name }}</span><span>{{ money(pkg.priceNaira) }}</span></div>
+                  <div><span>Number of travellers</span><span>× {{ form.travellers }}</span></div>
+                  <div class="order-summary__total"><span>Total to pay</span><strong>{{ money(total) }}</strong></div>
+                  <small *ngIf="!pkg.checkoutEnabled">Online checkout is temporarily unavailable. Contact Wakanow for assistance.</small>
+                </div>
+                <label class="terms-checkbox" for="terms-accepted">
+                  <input id="terms-accepted" name="termsAccepted" type="checkbox" [(ngModel)]="form.termsAccepted" required #terms="ngModel" [attr.aria-invalid]="terms.invalid && formSubmitted">
+                  <span>I have read the <a [routerLink]="[]" fragment="booking-terms" queryParamsHandling="preserve">booking terms</a>, and understand that travel arrangements require confirmation. I agree to be contacted about this booking.</span>
+                </label>
+                <p class="field-error" *ngIf="terms.invalid && formSubmitted">Please accept the booking terms to continue.</p>
+              </fieldset>
+              <div class="payment-feedback" aria-live="polite"><p class="payment-error" *ngIf="paymentError" role="alert">{{ paymentError }}</p><p *ngIf="paymentMessage">{{ paymentMessage }}</p></div>
+              <button class="check-payment-button" *ngIf="recoveryRequired" type="button" [disabled]="busy" (click)="recoverBooking()">{{ busy ? 'Checking…' : 'Recover my booking before paying again' }}</button>
+              <button class="pay-button" type="submit" [disabled]="busy || !payable"><span>{{ paymentLabel }}</span><span aria-hidden="true">↗</span></button>
+              <p class="secure-note"><span aria-hidden="true">▣</span> Secure payment with <strong>paystack</strong></p>
+              <p class="privacy-note">Your details are used to arrange this booking. Card and bank details are entered securely with Paystack.</p>
+            </form>
+          </section>
+
+          <section class="checkout-card receipt-card" *ngIf="booking as receipt" [class.receipt-card--paid]="paid" aria-labelledby="receipt-heading">
+            <div class="receipt-symbol" aria-hidden="true">{{ paid ? '✓' : '↗' }}</div>
+            <p class="section-kicker">{{ paid ? 'You’re one step closer' : 'Your package booking' }}</p>
+            <h2 id="receipt-heading">{{ cancelled ? 'Booking cancelled.' : paid ? 'Payment received.' : 'Finish your booking.' }}</h2>
+            <p class="receipt-intro">{{ cancelled ? 'This booking has been cancelled. Contact the Wakanow team with your booking reference for assistance.' : paid ? 'Thank you, ' + receipt.customer.fullName + '. The Wakanow team will follow up with you to confirm your travel arrangements.' : 'Your details are saved. Complete secure payment below, or check the status if you have already paid.' }}</p>
+            <span class="receipt-status" [class.is-paid]="paid">{{ receipt.paymentStatus === 'Paid' ? 'Payment verified' : receipt.paymentStatus === 'Failed' ? 'Payment unsuccessful' : 'Awaiting payment' }}</span>
+            <dl class="receipt-details">
+              <div><dt>Package</dt><dd>{{ receipt.packageName }}</dd></div>
+              <div><dt>Travellers</dt><dd>{{ receipt.travellers }} {{ receipt.travellers === 1 ? 'person' : 'people' }}</dd></div>
+              <div><dt>{{ paid ? 'Amount paid' : 'Total to pay' }}</dt><dd class="receipt-amount">{{ money(receipt.totalAmountKobo / 100) }}</dd></div>
+              <div><dt>Booking status</dt><dd>{{ receipt.fulfillmentStatus }}</dd></div>
+              <div><dt>Contact email</dt><dd>{{ receipt.customer.email }}</dd></div>
+              <div><dt>Phone</dt><dd>{{ receipt.customer.phone }}</dd></div>
+              <div><dt>Booking reference</dt><dd class="receipt-reference">{{ receipt.id }}</dd></div>
+              <div><dt>Payment reference</dt><dd class="receipt-reference">{{ receipt.reference }}</dd></div>
+            </dl>
+            <p class="confirmation-note" *ngIf="paid && !cancelled && receipt.fulfillmentStatus !== 'Confirmed'">Your payment is confirmed. Your flight, hotel and final itinerary are still awaiting travel-team confirmation.</p>
+            <p class="confirmation-note" *ngIf="paid && receipt.fulfillmentStatus === 'Confirmed'">Your travel arrangements have been confirmed by the Wakanow team. Refer to the itinerary they share with you.</p>
+            <div class="payment-feedback" aria-live="polite"><p class="payment-error" *ngIf="paymentError" role="alert">{{ paymentError }}</p><p *ngIf="paymentMessage">{{ paymentMessage }}</p></div>
+            <div class="receipt-actions" *ngIf="!paid && !cancelled">
+              <button class="pay-button" *ngIf="receipt.paymentStatus !== 'Failed'" type="button" [disabled]="busy || !payable" (click)="resumePayment()"><span>{{ paymentLabel }}</span><span aria-hidden="true">↗</span></button>
+              <button class="pay-button" *ngIf="receipt.paymentStatus === 'Failed'" type="button" [disabled]="busy || !payable" (click)="startNewPayment()"><span>Review details &amp; try again</span><span aria-hidden="true">↗</span></button>
+              <button class="check-payment-button" type="button" [disabled]="busy" (click)="verifyPayment()">{{ busy ? 'Checking…' : 'I’ve paid — check payment status' }}</button>
+            </div>
+            <a class="receipt-home" *ngIf="paid" routerLink="/" fragment="packages">Back to The Headies experience <span aria-hidden="true">→</span></a>
+            <p class="privacy-note">Keep your booking and payment references. This private booking summary is available in this browser session.</p>
+          </section>
+
+          <div class="booking-help"><span class="booking-help__icon" aria-hidden="true">?</span><div><h3>A little help goes a long way.</h3><p>Speak to the Wakanow travel team.</p><a href="tel:07009252669">0700 925 2669 <span aria-hidden="true">↗</span></a></div></div>
+        </aside>
+      </div>
+    </ng-container>
+  </main>
+  <footer class="package-footer"><div class="container"><span>The Headies × Wakanow</span><p>Your journey. Your experience. Your Toronto.</p><a routerLink="/">Back to home <span aria-hidden="true">↑</span></a></div></footer>
+</div>

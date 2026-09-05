@@ -3,6 +3,7 @@ import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService, TravelRequest } from '../api.service';
+import { PackageShowcaseComponent } from '../package-showcase/package-showcase.component';
 
 interface SummaryRow {
   k: string;
@@ -13,7 +14,7 @@ interface SummaryRow {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, PackageShowcaseComponent],
   template: `
     <div class="page-shell">
       <div class="topbar">
@@ -60,13 +61,13 @@ interface SummaryRow {
             <div class="hero__copy">
               <p class="eyebrow">Powered by Wakanow</p>
               <h1>Road to<br><span>Toronto</span></h1>
-              <p>Plan your Headies Canada trip end to end. Choose flight class, hotel category, airport transfer and optional car rental in one clean dark-mode travel flow.</p>
+              <p>Make Toronto part of your Headies story. Explore our travel packages with flights, hotel stays and event access, or let Wakanow help you create a trip of your own.</p>
               <div class="hero-pills" aria-label="Travel services">
                 <span>Flights</span><span>Hotels and villas</span><span>Airport transfer</span><span>Visa guidance</span><span>Concierge</span>
               </div>
               <div class="hero-actions">
-                <a class="btn btn-primary" href="#planner">Build my travel plan</a>
-                <a class="btn btn-secondary" href="#luxury">Talk to concierge</a>
+                <a class="btn btn-primary" href="#packages">Explore the packages</a>
+                <a class="btn btn-secondary" href="#planner">Build a custom trip</a>
               </div>
             </div>
             <div class="hero-media">
@@ -80,6 +81,8 @@ interface SummaryRow {
             </div>
           </div>
         </section>
+
+        <app-package-showcase />
 
         <section class="section" id="planner">
           <div class="container">
@@ -228,27 +231,6 @@ interface SummaryRow {
           </div>
         </section>
 
-        <section class="section section--panel" id="packages">
-          <div class="container">
-            <div class="section-head">
-              <p class="section-kicker">Travel options</p>
-              <h2>Choose your arrival style</h2>
-              <p>Begin from a common Headies Canada path, then fine-tune in the planner.</p>
-            </div>
-            <div class="package-grid">
-              <article class="package-card" *ngFor="let card of packageCards">
-                <div class="package-card__media"><img [src]="card.image" [alt]="card.title"><span class="package-tag">{{ card.tag }}</span></div>
-                <div class="package-card__body">
-                  <p class="section-kicker">{{ card.kicker }}</p>
-                  <h3>{{ card.title }}</h3>
-                  <p>{{ card.copy }}</p>
-                  <ul class="check-list"><li *ngFor="let item of card.items">{{ item }}</li></ul>
-                </div>
-              </article>
-            </div>
-          </div>
-        </section>
-
         <section class="section luxury" id="luxury">
           <div class="container luxury-grid">
             <div>
@@ -286,7 +268,7 @@ interface SummaryRow {
         <div class="container">
           <div class="footer-grid">
             <div><a class="brand" routerLink="/"><img src="assets/headies-logo.png" alt="The Headies"><span class="brand__divider"></span><img src="assets/wakanow-logo.png" alt="Wakanow"></a><p style="margin-top:14px">Travel support for The Headies Canada weekend.</p></div>
-            <div><h4>Explore</h4><a href="#planner">Build trip</a><a href="#luxury">Luxury service</a></div>
+            <div><h4>Explore</h4><a href="#packages">Travel packages</a><a href="#planner">Build trip</a><a href="#luxury">Luxury service</a></div>
             <div><h4>Visa</h4><a routerLink="/visa">Start application</a></div>
             <div><h4>Support</h4><p>visa&#64;wakanow.com</p><p>0700 925 2669</p></div>
           </div>
@@ -340,12 +322,6 @@ export class HomeComponent {
     { value: 'Luxury Van', title: 'Van / group', sub: 'Team movement' }
   ];
   services = ['VIP movement', 'Private jet', 'Executive hotel', 'Artist logistics', 'Airport protocol', 'Security support'];
-
-  packageCards = [
-    { image: 'assets/img/headies-plane.png', tag: 'Flight + Stay', kicker: 'Weekend access', title: 'Fly in for awards night', copy: 'A straightforward path for guests who need flights, a stay and airport movement around the main event.', items: ['Return flights and 4 nights', 'Airport transfer option', 'Visa support path'] },
-    { image: 'assets/img/event.jpg', tag: 'Hotel + Event', kicker: 'Premium guest flow', title: 'Add event access and arrival planning', copy: 'For guests who want travel to connect cleanly with the show, red carpet and partner moments.', items: ['Return flights and 4 nights', 'Premium event ticket information', 'Pay Small Small when available'] },
-    { image: 'assets/img/vip.jpg', tag: 'VIP', kicker: 'High-touch access', title: 'Build a premium weekend plan', copy: 'For executives, partners, artists and teams who need elevated stays, movement and support.', items: ['Business-class enquiry path', '5-star hotels or villa options', 'Executive transfer support'] }
-  ];
 
   trip = {
     flightType: 'Commercial Flight',

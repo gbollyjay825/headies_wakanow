@@ -1,0 +1,65 @@
+<section class="package-bookings" aria-labelledby="packageBookingsHeading">
+  <div class="booking-summary">
+    <div><span>Package orders</span><strong>{{ bookings.length }}</strong><small>{{ paidCount }} paid</small></div>
+    <div><span>Verified payments</span><strong>{{ money(paidTotal) }}</strong><small>Gross payments received</small></div>
+    <div><span>Awaiting payment</span><strong>{{ pendingCount }}</strong><small>Open, unpaid orders</small></div>
+    <div><span>To follow up</span><strong>{{ needsAttentionCount }}</strong><small>Paid, awaiting confirmation</small></div>
+  </div>
+
+  <div class="admin-card booking-card">
+    <div class="booking-heading">
+      <div>
+        <span class="booking-kicker">Guest checkout</span>
+        <h2 id="packageBookingsHeading">Package bookings</h2>
+        <p>Review customer details, track payments and coordinate their Toronto trip.</p>
+      </div>
+      <div class="booking-actions">
+        <button class="btn btn-ghost btn-small" type="button" (click)="loadBookings()" [disabled]="loading || !!updatingId">{{ loading ? 'Refreshing…' : 'Refresh orders' }}</button>
+        <button class="btn btn-blue btn-small" type="button" (click)="exportCsv()" [disabled]="!filteredBookings.length || loading">Export filtered CSV</button>
+      </div>
+    </div>
+
+    <p class="booking-message booking-message--error" role="alert" *ngIf="error">{{ error }}</p>
+    <p class="booking-message" role="status" *ngIf="feedback">{{ feedback }}</p>
+
+    <div class="booking-filters">
+      <label class="field"><span class="form-label">Search bookings</span><input name="packageBookingSearch" type="search" [(ngModel)]="search" (ngModelChange)="reconcileSelection()" placeholder="Customer, package or reference"></label>
+      <label class="field"><span class="form-label">Payment</span><select name="packagePaymentFilter" [(ngModel)]="paymentFilter" (ngModelChange)="reconcileSelection()"><option value="all">All payments</option><option value="Paid">Paid</option><option value="Pending">Pending</option><option value="Unpaid">Unpaid</option><option value="Failed">Failed</option></select></label>
+      <label class="field"><span class="form-label">Booking progress</span><select name="packageFulfillmentFilter" [(ngModel)]="fulfillmentFilter" (ngModelChange)="reconcileSelection()"><option value="all">All statuses</option><option *ngFor="let status of fulfillmentStatuses" [value]="status">{{ status }}</option></select></label>
+    </div>
+
+    <p class="booking-result-count" aria-live="polite">{{ loading ? 'Loading package bookings…' : 'Showing ' + filteredBookings.length + ' of ' + bookings.length + ' bookings' }}</p>
+    <div class="booking-empty" *ngIf="!loading && !bookings.length && !error"><span aria-hidden="true">◇</span><h3>Your first booking starts here</h3><p>Package orders will appear as customers begin checkout. Verified payments are highlighted for follow-up.</p></div>
+    <div class="booking-empty" *ngIf="!loading && bookings.length && !filteredBookings.length"><h3>No matching bookings</h3><p>Try a different customer name or broaden the filters.</p><button class="btn btn-ghost btn-small" type="button" (click)="resetFilters()">Clear filters</button></div>
+
+    <div class="booking-workbench" *ngIf="filteredBookings.length" [attr.aria-busy]="loading">
+      <aside class="booking-list" aria-label="Package orders">
+        <button type="button" class="booking-list-item" *ngFor="let booking of filteredBookings" [class.is-active]="selectedId === booking.id" [attr.aria-pressed]="selectedId === booking.id" (click)="selectBooking(booking)">
+          <span class="booking-list-item__top"><strong>{{ booking.customer.fullName }}</strong><span class="pill" [class.pill--ok]="booking.paymentStatus === 'Paid'" [class.pill--warn]="booking.paymentStatus !== 'Paid'">{{ booking.paymentStatus }}</span></span>
+          <span class="booking-list-item__package">{{ booking.packageName }}</span>
+          <span class="booking-list-item__meta">{{ booking.travellers }} traveller{{ booking.travellers === 1 ? '' : 's' }} · {{ money(booking.totalAmountKobo, booking.currency) }}</span>
+          <span class="booking-list-item__foot"><span>{{ booking.fulfillmentStatus }}</span><span>{{ date(booking.createdAt) }}</span></span>
+          <small>{{ booking.reference }}</small>
+        </button>
+      </aside>
+
+      <article class="booking-detail" *ngIf="selectedBooking as booking" aria-label="Selected booking details">
+        <div class="booking-detail__head"><div><span class="booking-kicker">{{ booking.reference }}</span><h3>{{ booking.customer.fullName }}</h3><p>{{ booking.packageName }}</p></div><span class="pill" [class.pill--ok]="booking.paymentStatus === 'Paid'" [class.pill--warn]="booking.paymentStatus !== 'Paid'">{{ booking.paymentStatus === 'Paid' ? 'Payment verified' : booking.paymentStatus }}</span></div>
+        <div class="booking-amount"><div><span>Order total</span><strong>{{ money(booking.totalAmountKobo, booking.currency) }}</strong></div><span>{{ booking.travellers }} traveller{{ booking.travellers === 1 ? '' : 's' }}</span></div>
+
+        <section class="booking-detail-section"><h4>Lead guest</h4><dl class="booking-details-grid"><div><dt>Email</dt><dd><a [href]="'mailto:' + booking.customer.email">{{ booking.customer.email }}</a></dd></div><div><dt>Phone</dt><dd><a [href]="'tel:' + booking.customer.phone">{{ booking.customer.phone }}</a></dd></div></dl></section>
+        <section class="booking-detail-section"><h4>Travel preferences</h4><dl class="booking-details-grid"><div><dt>Departure city</dt><dd>{{ booking.departureCity || 'Not supplied' }}</dd></div><div><dt>Preferred departure</dt><dd>{{ date(booking.travelDate) }}</dd></div><div><dt>Room preference</dt><dd>{{ booking.roomPreference || 'Not supplied' }}</dd></div><div><dt>Travellers</dt><dd>{{ booking.travellers }}</dd></div><div class="booking-detail-wide"><dt>Special requests</dt><dd class="booking-notes">{{ booking.notes || 'No special requests supplied.' }}</dd></div></dl></section>
+        <section class="booking-detail-section"><h4>Payment record</h4><dl class="booking-details-grid"><div class="booking-detail-wide"><dt>Order / Paystack reference</dt><dd>{{ booking.reference || 'Not initialized' }}</dd></div><div><dt>Unit price</dt><dd>{{ money(booking.unitPriceNaira * 100, booking.currency) }} per person</dd></div><div><dt>Payment received</dt><dd>{{ booking.paidAt ? date(booking.paidAt) : 'Not yet verified' }}</dd></div><div><dt>Order created</dt><dd>{{ date(booking.createdAt) }}</dd></div><div><dt>Last updated</dt><dd>{{ date(booking.updatedAt) }}</dd></div></dl></section>
+        <section class="booking-detail-section" *ngIf="booking.packageSnapshot as snapshot"><h4>Package at checkout</h4><dl class="booking-details-grid"><div class="booking-detail-wide" *ngIf="snapshot.inclusions?.length"><dt>Included</dt><dd>{{ snapshot.inclusions?.join(' · ') }}</dd></div><div class="booking-detail-wide" *ngIf="snapshot.exclusions?.length"><dt>Excluded</dt><dd>{{ snapshot.exclusions?.join(' · ') }}</dd></div><div class="booking-detail-wide" *ngIf="snapshot.hotels?.length"><dt>Advertised hotel options</dt><dd>{{ snapshot.hotels?.join(' · ') }}</dd></div></dl></section>
+
+        <form class="booking-progress" (ngSubmit)="saveStatus(booking)">
+          <div><h4>Booking progress</h4><p>Update the travel team's progress after contacting the customer.</p></div>
+          <label class="field"><span class="form-label">Fulfillment status</span><select name="packageBookingStatus" [(ngModel)]="draftStatus" [disabled]="!!updatingId || loading"><option *ngFor="let status of fulfillmentStatuses" [value]="status" [disabled]="statusDisabled(status, booking)">{{ status }}</option></select></label>
+          <button class="btn btn-blue" type="submit" [disabled]="!!updatingId || loading || draftStatus === booking.fulfillmentStatus || statusDisabled(draftStatus, booking)">{{ updatingId === booking.id ? 'Saving…' : 'Save progress' }}</button>
+          <small *ngIf="booking.paymentStatus !== 'Paid'">Payment must be verified before this booking can be confirmed.</small>
+          <small *ngIf="draftStatus === 'Cancelled'">Cancelling fulfillment does not issue a payment refund.</small>
+        </form>
+      </article>
+    </div>
+  </div>
+</section>

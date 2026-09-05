@@ -1,0 +1,57 @@
+<div class="admin-page package-admin-page">
+  <header class="site-nav">
+    <div class="container site-nav__inner">
+      <a class="brand" routerLink="/" aria-label="The Headies x Wakanow home">
+        <img src="assets/headies-logo.png" alt="The Headies">
+        <span class="brand__divider" aria-hidden="true"></span>
+        <img src="assets/wakanow-logo.png" alt="Wakanow">
+      </a>
+      <span class="badge package-admin-label">Package desk | Admin</span>
+      <div class="nav-actions">
+        <a class="btn btn-ghost btn-small" routerLink="/admin" *ngIf="isAdmin">Travel admin</a>
+        <a class="btn btn-blue btn-small" routerLink="/">View site</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div class="container">
+      <section class="package-login portal-card" *ngIf="checkingSession" aria-live="polite" aria-busy="true">
+        <span class="badge">Package dashboard</span>
+        <h1>Checking your session…</h1>
+        <p>Your booking workspace will open after your admin access is verified.</p>
+      </section>
+
+      <section class="package-login portal-card" *ngIf="!checkingSession && !isAdmin" aria-labelledby="packageAdminLoginHeading">
+        <span class="badge">Admin access</span>
+        <h1 id="packageAdminLoginHeading">Package dashboard</h1>
+        <p>Sign in with your admin or superadmin passcode to review bookings, track payments and manage each customer's trip.</p>
+        <form #loginForm="ngForm" (ngSubmit)="login(loginForm.valid)">
+          <label class="field">
+            <span class="form-label">Admin passcode</span>
+            <input name="packageAdminPasscode" type="password" autocomplete="current-password" [(ngModel)]="passcode" required [disabled]="working" [attr.aria-describedby]="loginError ? 'packageLoginError' : null">
+          </label>
+          <button class="btn btn-blue btn-block" type="submit" [disabled]="working || !passcode.trim()">{{ working ? 'Signing in…' : 'Open package dashboard' }}</button>
+          <p class="package-login-error" id="packageLoginError" role="alert" *ngIf="loginError">{{ loginError }}</p>
+        </form>
+        <a class="package-login-back" routerLink="/">Back to the home page</a>
+      </section>
+
+      <section *ngIf="!checkingSession && isAdmin" class="package-admin-workspace" aria-labelledby="packageAdminHeading">
+        <div class="package-page-heading">
+          <div>
+            <span class="package-page-kicker">Road to Toronto</span>
+            <h1 id="packageAdminHeading">Package dashboard</h1>
+            <p>Track customer bookings, verified payments and travel arrangements in one place.</p>
+          </div>
+          <div class="package-page-actions">
+            <span class="badge">{{ adminRole === 'super' ? 'Super admin' : 'Admin' }}</span>
+            <button class="btn btn-ghost btn-small" type="button" (click)="refresh()">Refresh</button>
+            <button class="btn btn-danger btn-small" type="button" (click)="logout()">Sign out</button>
+          </div>
+        </div>
+        <app-package-admin [adminCode]="adminCode"></app-package-admin>
+      </section>
+    </div>
+  </main>
+</div>

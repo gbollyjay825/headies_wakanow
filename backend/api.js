@@ -1,6 +1,7 @@
 const repository = require('./repository');
 const { parsePassport } = require('./passport-parser');
 const { sendTravelRequestEmail } = require('./travel-request-email');
+const { handlePackageApi } = require('./package-api');
 const {
   calculateVisaAmountKobo,
   cleanCallbackUrl,
@@ -231,6 +232,8 @@ function uploadedFieldSet(existing, bodyUploads) {
 async function handleApi(method, pathname, body = {}, req = null) {
   const parts = pathname.split('/').filter(Boolean);
   if (parts[0] !== 'api') return null;
+  const packageResponse = await handlePackageApi(method, parts, body || {}, req, requireAdmin);
+  if (packageResponse) return packageResponse;
 
   if (method === 'GET' && parts[1] === 'health') {
     return response(200, {

@@ -1,13 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, UploadGroup, VisaApplication, VisaPricing } from '../api.service';
+import { PackageAdminComponent } from '../package-admin/package-admin.component';
 
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, PackageAdminComponent],
   template: `
     <div class="admin-page">
       <header class="site-nav">
@@ -19,7 +20,8 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
           </a>
           <span class="badge">Travel Desk | Admin</span>
           <div class="nav-actions">
-            <button class="btn btn-ghost btn-small" type="button" (click)="loadDashboard()">Refresh</button>
+            <a class="btn btn-ghost btn-small" routerLink="/package_admin" *ngIf="isAdmin">Package dashboard</a>
+            <button class="btn btn-ghost btn-small" type="button" (click)="refreshActiveSection()">Refresh</button>
             <a class="btn btn-blue btn-small" routerLink="/">View site</a>
           </div>
         </div>
@@ -44,7 +46,7 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
             <div class="admin-title">
               <div>
                 <h1>Road to Toronto | Travel Admin</h1>
-                <p>Manage travel enquiries, visa access and submitted applications in one workspace.</p>
+                <p>Manage package bookings, travel enquiries, visa access and submitted applications in one workspace.</p>
               </div>
               <div class="admin-title__actions">
                 <span class="badge">{{ isSuperAdmin ? 'Super admin' : 'Admin' }}</span>
@@ -66,6 +68,9 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
               <button type="button" [class.is-active]="activeTab === 'requests'" (click)="activeTab = 'requests'">
                 Travel requests <span>{{ travelRequests.length }}</span>
               </button>
+              <button type="button" [class.is-active]="activeTab === 'packages'" (click)="activeTab = 'packages'">
+                Package bookings
+              </button>
               <button type="button" *ngIf="isSuperAdmin" [class.is-active]="activeTab === 'applications'" (click)="activeTab = 'applications'">
                 Visa applications <span>{{ applications.length }}</span>
               </button>
@@ -76,6 +81,8 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                 Allowlist <span>{{ applicants.length }}</span>
               </button>
             </nav>
+
+            <app-package-admin *ngIf="isAdmin && activeTab === 'packages'" [adminCode]="superAdminCode"></app-package-admin>
 
             <section class="admin-card admin-import-card" [hidden]="activeTab !== 'setup'">
               <div class="admin-import-card__copy">
@@ -425,7 +432,7 @@ import { ApiService, EligibleApplicant, TravelRequest, UploadedFileRecord, Uploa
                 </div>
               </section>
 
-              <div class="admin-grid admin-grid--allowlist" [class.admin-grid--wide-panel]="activeTab === 'allowlist'" [hidden]="activeTab === 'applications' || activeTab === 'requests'">
+              <div class="admin-grid admin-grid--allowlist" [class.admin-grid--wide-panel]="activeTab === 'allowlist'" [hidden]="activeTab === 'applications' || activeTab === 'requests' || activeTab === 'packages'">
                 <aside class="admin-card admin-card--compact" [hidden]="activeTab !== 'setup'">
                   <div class="admin-card__head">
                     <h2>Preload one email</h2>
@@ -557,7 +564,8 @@ export class AdminComponent implements OnInit {
   pricingModel = { basic: 745000, premium: 745000, nominee: 350000 };
   importFile: File | null = null;
   selectedImportFileName = '';
-  activeTab: 'requests' | 'applications' | 'setup' | 'allowlist' = 'requests';
+  activeTab: 'requests' | 'applications' | 'packages' | 'setup' | 'allowlist' = 'requests';
+  @ViewChild(PackageAdminComponent) packageAdmin?: PackageAdminComponent;
   requestSearch = '';
   requestTypeFilter: 'all' | 'Travel' | 'Luxury' = 'all';
   requestStatusFilter = 'all';
@@ -741,6 +749,14 @@ export class AdminComponent implements OnInit {
         ? `Could not load the dashboard: ${error.message}`
         : 'Could not load the dashboard. Use Refresh to try again.';
     }
+  }
+
+  async refreshActiveSection(): Promise<void> {
+    if (this.activeTab === 'packages' && this.packageAdmin) {
+      await this.packageAdmin.loadBookings();
+      return;
+    }
+    await this.loadDashboard();
   }
 
   async downloadDocument(app: VisaApplication, file: UploadedFileRecord): Promise<void> {

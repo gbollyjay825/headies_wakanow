@@ -49,18 +49,21 @@ function sendBinaryFile(res, status, file) {
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let raw = '';
+    const chunks = [];
+    let size = 0;
     req.on('data', (chunk) => {
-      raw += chunk;
-      if (Buffer.byteLength(raw) > maxBodyBytes) {
+      chunks.push(Buffer.from(chunk));
+      size += chunk.length;
+      if (size > maxBodyBytes) {
         reject(new Error('Payload too large'));
         req.destroy();
       }
     });
     req.on('end', () => {
-      if (!raw) return resolve({});
+      req.rawBody = Buffer.concat(chunks);
+      if (!req.rawBody.length) return resolve({});
       try {
-        resolve(JSON.parse(raw));
+        resolve(JSON.parse(req.rawBody.toString('utf8')));
       } catch (error) {
         reject(new Error('Invalid JSON body'));
       }
@@ -121,6 +124,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname.startsWith('/api/')) {
+    if (url.pathname.startsWith('/api/package-bookings')) res.setHeader('cache-control', 'private, no-store');
     try {
       const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
       const result = await handleApi(req.method, url.pathname, body, req);

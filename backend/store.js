@@ -12,7 +12,8 @@ const emptyStore = {
   requests: [],
   eligibleApplicants: [],
   visaApplications: [],
-  visaPricing: {}
+  visaPricing: {},
+  packageBookings: []
 };
 
 function ensureStore() {
@@ -30,7 +31,8 @@ function readStore() {
       requests: Array.isArray(parsed.requests) ? parsed.requests : [],
       eligibleApplicants: Array.isArray(parsed.eligibleApplicants) ? parsed.eligibleApplicants : [],
       visaApplications: Array.isArray(parsed.visaApplications) ? parsed.visaApplications : [],
-      visaPricing: parsed.visaPricing && typeof parsed.visaPricing === 'object' ? parsed.visaPricing : {}
+      visaPricing: parsed.visaPricing && typeof parsed.visaPricing === 'object' ? parsed.visaPricing : {},
+      packageBookings: Array.isArray(parsed.packageBookings) ? parsed.packageBookings : []
     };
   } catch (error) {
     return { ...emptyStore };
@@ -43,7 +45,8 @@ function writeStore(nextStore) {
     requests: Array.isArray(nextStore.requests) ? nextStore.requests : [],
     eligibleApplicants: Array.isArray(nextStore.eligibleApplicants) ? nextStore.eligibleApplicants : [],
     visaApplications: Array.isArray(nextStore.visaApplications) ? nextStore.visaApplications : [],
-    visaPricing: nextStore.visaPricing && typeof nextStore.visaPricing === 'object' ? nextStore.visaPricing : {}
+    visaPricing: nextStore.visaPricing && typeof nextStore.visaPricing === 'object' ? nextStore.visaPricing : {},
+    packageBookings: Array.isArray(nextStore.packageBookings) ? nextStore.packageBookings : []
   };
   fs.writeFileSync(dataFile, JSON.stringify(normalized, null, 2));
   return normalized;

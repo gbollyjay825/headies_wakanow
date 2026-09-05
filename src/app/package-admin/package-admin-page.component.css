@@ -1,0 +1,15 @@
+:host { display: block; }
+.package-login { max-width: 480px; margin: 64px auto 30px; padding: 32px; }
+.package-login h1 { margin: 18px 0 12px; font-size: 29px; letter-spacing: -.035em; }
+.package-login > p { margin: 0 0 25px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.package-login form .btn { margin-top: 18px; }
+.package-login-error { color: #ffb7ac; font-size: 13px; line-height: 1.5; margin: 14px 0 0; }
+.package-login-back { display: inline-block; margin-top: 22px; color: #a9d2ff; font-size: 12px; text-decoration: none; }
+.package-login-back:hover { text-decoration: underline; }
+.package-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.package-page-kicker { color: #94c6fa; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.package-page-heading h1 { margin: 9px 0 10px; font-size: clamp(28px, 3vw, 38px); letter-spacing: -.04em; }
+.package-page-heading p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.package-page-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
+@media (max-width: 1000px) { .package-page-heading { align-items: flex-start; flex-direction: column; } .package-admin-label { display: none; } }
+@media (max-width: 600px) { .package-login { padding: 24px; margin-top: 32px; } .package-page-actions { width: 100%; } .package-page-actions .btn { flex: 1; } .package-admin-page .nav-actions { flex-wrap: wrap; } }

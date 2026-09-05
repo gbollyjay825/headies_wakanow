@@ -4,22 +4,34 @@ const maxBodyBytes = 35 * 1024 * 1024;
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
+    if (Buffer.isBuffer(req.body) || typeof req.body === 'string') {
+      req.rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body);
+      if (req.rawBody.length > maxBodyBytes) return reject(new Error('Payload too large'));
+      try { resolve(req.rawBody.length ? JSON.parse(req.rawBody.toString('utf8')) : {}); }
+      catch { reject(new Error('Invalid JSON body')); }
+      return;
+    }
     if (req.body && typeof req.body === 'object') {
+      // An already-parsed body cannot authenticate a webhook. The webhook
+      // handler will reject it unless the hosting adapter also supplied rawBody.
       resolve(req.body);
       return;
     }
-    let raw = '';
+    const chunks = [];
+    let size = 0;
     req.on('data', (chunk) => {
-      raw += chunk;
-      if (Buffer.byteLength(raw) > maxBodyBytes) {
+      chunks.push(Buffer.from(chunk));
+      size += chunk.length;
+      if (size > maxBodyBytes) {
         reject(new Error('Payload too large'));
         req.destroy();
       }
     });
     req.on('end', () => {
-      if (!raw) return resolve({});
+      req.rawBody = Buffer.concat(chunks);
+      if (!req.rawBody.length) return resolve({});
       try {
-        resolve(JSON.parse(raw));
+        resolve(JSON.parse(req.rawBody.toString('utf8')));
       } catch (error) {
         reject(new Error('Invalid JSON body'));
       }
@@ -31,6 +43,7 @@ function readBody(req) {
 module.exports = async function handler(req, res) {
   try {
     const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
+    if (url.pathname.startsWith('/api/package-bookings')) res.setHeader('cache-control', 'private, no-store');
     const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
     const result = await handleApi(req.method, url.pathname, body, req);
     if (result && result.data && result.data.__binaryFile) {
@@ -49,3 +62,5 @@ module.exports = async function handler(req, res) {
     res.status(error.message === 'Payload too large' ? 413 : 400).json({ error: error.message });
   }
 };
+
+module.exports.config = { api: { bodyParser: false } };

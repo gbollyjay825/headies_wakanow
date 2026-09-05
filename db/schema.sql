@@ -222,3 +222,21 @@ values
   ('visa_premium_fee_naira', '745000'),
   ('visa_nominee_fee_naira', '350000')
 on conflict (key) do nothing;
+
+create table if not exists package_bookings (
+  id text primary key,
+  reference text not null unique,
+  idempotency_key text not null unique,
+  token_hash text not null,
+  total_amount_kobo bigint not null check (total_amount_kobo > 0),
+  payment_status text not null default 'Pending'
+    check (payment_status in ('Unpaid', 'Pending', 'Paid', 'Failed')),
+  fulfillment_status text not null default 'Awaiting payment'
+    check (fulfillment_status in ('Awaiting payment', 'Payment received', 'Contacted', 'Confirmed', 'Cancelled')),
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists package_bookings_created_idx on package_bookings (created_at desc);
+create index if not exists package_bookings_fulfillment_idx on package_bookings (fulfillment_status, updated_at desc);
